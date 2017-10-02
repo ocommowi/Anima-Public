@@ -46,7 +46,7 @@ FastCorrelationImageToImageMetric<TFixedImage,TMovingImage>
 
     AccumulateType smm = itk::NumericTraits< AccumulateType >::Zero;
     AccumulateType sfm = itk::NumericTraits< AccumulateType >::Zero;
-    AccumulateType sm  = itk::NumericTraits< AccumulateType >::Zero;
+    AccumulateType sm = itk::NumericTraits< AccumulateType >::Zero;
 
     OutputPointType transformedPoint;
     ContinuousIndexType transformedIndex;
@@ -89,7 +89,7 @@ FastCorrelationImageToImageMetric<TFixedImage,TMovingImage>
         if (m_SquaredCorrelation)
             measure = covData * covData / multVars;
         else
-            measure = std::max(0.0,covData / sqrt(multVars));
+            measure = std::max(0.0,covData / std::sqrt(multVars));
     }
     else
     {
