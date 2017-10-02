@@ -197,6 +197,58 @@ void
 DistortionCorrectionBMRegistrationMethod <TInputImageType>
 ::PerformOneIteration(InputImageType *refImage, InputImageType *movingImage, TransformPointer &addOn)
 {
+    if (m_AttractionMode != Symmetric)
+        this->PerformOneIterationAttractor(refImage,movingImage,addOn);
+    else
+        this->PerformOneIterationSymmetric(refImage,movingImage,addOn);
+}
+
+template <typename TInputImageType>
+void
+DistortionCorrectionBMRegistrationMethod <TInputImageType>
+::PerformOneIterationAttractor(InputImageType *refImage, InputImageType *movingImage, TransformPointer &addOn)
+{
+    itk::TimeProbe tmpTime;
+    tmpTime.Start();
+
+    this->GetBlockMatcher()->SetForceComputeBlocks(m_AttractionMode == Untargeted_Attraction);
+    this->GetBlockMatcher()->SetReferenceImage(refImage);
+    this->GetBlockMatcher()->SetMovingImage(movingImage);
+    this->GetBlockMatcher()->SetNumberOfThreads(this->GetNumberOfThreads());
+    this->GetBlockMatcher()->Update();
+
+    tmpTime.Stop();
+
+    if (this->GetVerboseProgression())
+        std::cout << "Both-ways matching performed in " << tmpTime.GetTotal() << "s" << std::endl;
+
+    this->GetAgregator()->SetInputRegions(this->GetBlockMatcher()->GetBlockRegions());
+    this->GetAgregator()->SetInputOrigins(this->GetBlockMatcher()->GetBlockPositions());
+
+    typedef anima::BalooSVFTransformAgregator<InputImageType::ImageDimension> SVFAgregatorType;
+    SVFAgregatorType *tmpAgreg = dynamic_cast <SVFAgregatorType *> (this->GetAgregator());
+
+    if (tmpAgreg)
+        tmpAgreg->SetBlockDamWeights(this->GetBlockMatcher()->GetBlockDamWeights());
+    else
+    {
+        typedef anima::DenseSVFTransformAgregator<InputImageType::ImageDimension> SVFAgregatorType;
+        SVFAgregatorType *tmpDenseAgreg = dynamic_cast <SVFAgregatorType *> (this->GetAgregator());
+
+        tmpDenseAgreg->SetBlockDamWeights(this->GetBlockMatcher()->GetBlockDamWeights());
+    }
+
+    this->GetAgregator()->SetInputWeights(this->GetBlockMatcher()->GetBlockWeights());
+    this->GetAgregator()->SetInputTransforms(this->GetBlockMatcher()->GetBlockTransformPointers());
+
+    addOn = this->GetAgregator()->GetOutput();
+}
+
+template <typename TInputImageType>
+void
+DistortionCorrectionBMRegistrationMethod <TInputImageType>
+::PerformOneIterationSymmetric(InputImageType *refImage, InputImageType *movingImage, TransformPointer &addOn)
+{
     itk::TimeProbe tmpTime;
     tmpTime.Start();
 
@@ -209,7 +261,7 @@ DistortionCorrectionBMRegistrationMethod <TInputImageType>
     tmpTime.Stop();
 
     if (this->GetVerboseProgression())
-        std::cout << "Forward matching performed in " << tmpTime.GetTotal() << std::endl;
+        std::cout << "Forward matching performed in " << tmpTime.GetTotal() << "s" << std::endl;
 
     this->GetAgregator()->SetInputRegions(this->GetBlockMatcher()->GetBlockRegions());
     this->GetAgregator()->SetInputOrigins(this->GetBlockMatcher()->GetBlockPositions());
@@ -247,7 +299,7 @@ DistortionCorrectionBMRegistrationMethod <TInputImageType>
     tmpTimeReverse.Stop();
 
     if (this->GetVerboseProgression())
-        std::cout << "Backward matching performed in " << tmpTimeReverse.GetTotal() << std::endl;
+        std::cout << "Backward matching performed in " << tmpTimeReverse.GetTotal() << "s" << std::endl;
 
     this->GetAgregator()->SetInputRegions(this->GetBlockMatcher()->GetBlockRegions());
     this->GetAgregator()->SetInputOrigins(this->GetBlockMatcher()->GetBlockPositions());

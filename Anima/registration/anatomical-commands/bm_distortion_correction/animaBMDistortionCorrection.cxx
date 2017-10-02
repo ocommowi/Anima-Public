@@ -15,8 +15,9 @@ int main(int argc, const char** argv)
     TCLAP::CmdLine cmd("INRIA / IRISA - VisAGeS Team", ' ',ANIMA_VERSION);
     
     // Setting up parameters
-    TCLAP::ValueArg<std::string> backwardArg("b","backimage","Backward image (eg PA image)",true,"","backward image",cmd);
-    TCLAP::ValueArg<std::string> forwardArg("f","forwardimage","Forward image (eg AP image)",true,"","forward image",cmd);
+    TCLAP::ValueArg<std::string> backwardArg("b","bak-im","Backward image (eg PA image)",true,"","backward image",cmd);
+    TCLAP::ValueArg<std::string> forwardArg("f","forward-im","Forward image (eg AP image)",true,"","forward image",cmd);
+    TCLAP::ValueArg<std::string> extraT2Arg("m","middle-im","Extra reference image (eg T2 image)",false,"","reference T2 image",cmd);
     TCLAP::ValueArg<std::string> outArg("o","outputimage","Output (corrected) image",true,"","output image",cmd);
     TCLAP::ValueArg<std::string> initialTransformArg("i","initransform","Initial transformation",false,"","initial transform",cmd);
     TCLAP::ValueArg<std::string> outputTransformArg("O","outtransform","Output transformation",false,"","output transform",cmd);
@@ -27,7 +28,7 @@ int main(int argc, const char** argv)
     TCLAP::ValueArg<double> percentageKeptArg("k","per-kept","Percentage of blocks with the highest variance kept (default: 0.8)",false,0.8,"percentage of blocks kept",cmd);
     
     TCLAP::ValueArg<unsigned int> maxIterationsArg("","mi","Maximum block match iterations (default: 10)",false,10,"maximum iterations",cmd);
-    
+
     TCLAP::ValueArg<unsigned int> directionArg("d","dir","Gradient phase direction in image (default: 1 = Y axis)",false,1,"gradient phase direction",cmd);
     TCLAP::ValueArg<unsigned int> optimizerMaxIterationsArg("","oi","Maximum iterations for local optimizer (default: 100)",false,100,"maximum local optimizer iterations",cmd);
     
@@ -44,7 +45,9 @@ int main(int argc, const char** argv)
     TCLAP::ValueArg<unsigned int> agregatorArg("","agregator","Transformation agregator type (0: Baloo, 1: M-smoother, default: 0)",false,0,"agregator type",cmd);
     TCLAP::ValueArg<unsigned int> blockMetricArg("","metric","Similarity metric between blocks (0: correlation coefficient, 1: squared correlation coefficient, 2: mean squares, default: 1)",false,1,"similarity metric",cmd);
 
+    TCLAP::SwitchArg attractorModeArg("A","full-attractor", "Activate full attraction symmetric registration (already on if middle image provided)", cmd, false);
     TCLAP::SwitchArg weightedAgregationArg("w","no-weighted-agregation", "If set, weighted agregation is deactivated", cmd, false);
+
     TCLAP::ValueArg<double> extrapolationSigmaArg("","fs","Sigma for extrapolation of local pairings (default: 3)",false,3,"extrapolation sigma",cmd);
     TCLAP::ValueArg<double> elasticSigmaArg("","es","Sigma for elastic regularization (default: 2)",false,2,"elastic regularization sigma",cmd);
     TCLAP::ValueArg<double> outlierSigmaArg("","os","Sigma for outlier rejection among local pairings (default: 3)",false,3,"outlier rejection sigma",cmd);
@@ -75,6 +78,9 @@ int main(int argc, const char** argv)
     matcher->SetBackwardImage(anima::readImage<InputImageType>(backwardArg.getValue()).GetPointer());
     matcher->SetForwardImage(anima::readImage<InputImageType>(forwardArg.getValue()).GetPointer());
     
+    if (extraT2Arg.getValue() != "")
+        matcher->SetExtraMiddleImage(anima::readImage<InputImageType>(extraT2Arg.getValue()));
+
     if (initialTransformArg.getValue() != "")
         matcher->SetInitialTransformField(anima::readImage<VectorFieldType>(initialTransformArg.getValue()));
     
@@ -103,7 +109,10 @@ int main(int argc, const char** argv)
     matcher->SetNeighborhoodApproximation(neighborhoodApproximationArg.getValue());
     matcher->SetUseTransformationDam(useTransformDamArg.isSet());
     matcher->SetDamDistance(damDistanceArg.getValue());
+
+    matcher->SetAttractorMode(attractorModeArg.isSet());
     matcher->SetWeightedAgregation( weightedAgregationArg.isSet() );
+
     matcher->SetNumberOfPyramidLevels( numPyramidLevelsArg.getValue() );
     matcher->SetLastPyramidLevel( lastPyramidLevelArg.getValue() );
     matcher->SetTransformDirection(directionArg.getValue());

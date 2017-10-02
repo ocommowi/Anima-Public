@@ -4,6 +4,7 @@
 /* Similarity measures */
 #include <animaFastCorrelationImageToImageMetric.h>
 #include <animaFastMeanSquaresImageToImageMetric.h>
+#include <animaSymmetricCorrelationImageToImageMetric.h>
 
 /* Transforms */
 #include <animaDirectionScaleSkewTransform.h>
@@ -11,6 +12,8 @@
 #include <itkLinearInterpolateImageFunction.h>
 
 #include <itkImageRegionConstIterator.h>
+#include <itkAddImageFilter.h>
+#include <itkDivideImageFilter.h>
 
 namespace anima
 {
@@ -30,6 +33,79 @@ DistortionCorrectionBlockMatcher<TInputImageType>
     m_SearchScaleRadius = 0.1;
 
     m_TransformDirection = 1;
+
+    m_AttractorMode = false;
+    m_ExtraMiddleImage = 0;
+}
+
+template <typename TInputImageType>
+void
+DistortionCorrectionBlockMatcher<TInputImageType>
+::InitializeBlocks()
+{
+    if (!m_AttractorMode)
+    {
+        this->Superclass::InitializeBlocks();
+        return;
+    }
+
+    InputImagePointer refImBlocks = m_ExtraMiddleImage;
+
+    if (refImBlocks.IsNull())
+    {
+        typedef itk::AddImageFilter <InputImageType, InputImageType, InputImageType> AddFilterType;
+        typename AddFilterType::Pointer adder = AddFilterType::New();
+        adder->SetInput1(this->GetReferenceImage());
+        adder->SetInput2(this->GetMovingImage());
+        if (this->GetNumberOfThreads() != 0)
+            adder->SetNumberOfThreads(this->GetNumberOfThreads());
+        adder->Update();
+
+        typedef itk::DivideImageFilter <InputImageType, itk::Image <float, InputImageType::ImageDimension>, InputImageType> DivFilterType;
+        typename DivFilterType::Pointer divider = DivFilterType::New();
+        divider->SetInput1(adder->GetOutput());
+        divider->SetConstant(2.0);
+        if (this->GetNumberOfThreads() != 0)
+            divider->SetNumberOfThreads(this->GetNumberOfThreads());
+        divider->Update();
+
+        refImBlocks = divider->GetOutput();
+        refImBlocks->DisconnectPipeline();
+        m_ArtificialMiddleImage = refImBlocks;
+    }
+
+    typedef typename TInputImageType::IOPixelType InputPixelType;
+    typedef typename anima::BlockMatchingInitializer<InputPixelType,TInputImageType::ImageDimension> InitializerType;
+    typedef typename InitializerType::Pointer InitializerPointer;
+
+    InitializerPointer initPtr = InitializerType::New();
+    initPtr->AddReferenceImage(refImBlocks);
+
+    if (this->GetNumberOfThreads() != 0)
+        initPtr->SetNumberOfThreads(this->GetNumberOfThreads());
+
+    initPtr->SetPercentageKept(this->GetBlockPercentageKept());
+    initPtr->SetBlockSize(this->GetBlockSize());
+    initPtr->SetBlockSpacing(this->GetBlockSpacing());
+    initPtr->SetOrientedModelVarianceThreshold(this->GetBlockVarianceThreshold());
+
+    initPtr->SetRequestedRegion(refImBlocks->GetLargestPossibleRegion());
+
+    initPtr->SetComputeOuterDam(this->GetUseTransformationDam());
+    initPtr->SetDamDistance(this->GetDamDistance());
+
+    this->SetBlockRegions(initPtr->GetOutput());
+    this->SetBlockPositions(initPtr->GetOutputPositions());
+    this->SetBlockDamWeights(initPtr->GetBlockDamWeights());
+
+    if (this->GetVerbose())
+        std::cout << "Generated " << this->GetBlockRegions().size() << " blocks..." << std::endl;
+
+    this->GetBlockTransformPointers().resize(this->GetBlockRegions().size());
+    std::vector <double> newBlockWeights(this->GetBlockRegions().size(),0);
+    this->SetBlockWeights(newBlockWeights);
+    for (unsigned int i = 0;i < this->GetBlockRegions().size();++i)
+        this->GetBlockTransformPointer(i) = this->GetNewBlockTransform(this->GetBlockPositions()[i]);
 }
 
 template <typename TInputImageType>
@@ -73,6 +149,29 @@ DistortionCorrectionBlockMatcher<TInputImageType>
             break;
         }
 
+        case SymmetricCorrelation:
+        {
+            typedef anima::SymmetricCorrelationImageToImageMetric <InputImageType,InputImageType> LocalMetricType;
+            typename LocalMetricType::Pointer tmpMetric = LocalMetricType::New();
+            tmpMetric->SetSquaredCorrelation(true);
+            tmpMetric->SetScaleIntensities(true);
+
+            typedef itk::LinearInterpolateImageFunction<InputImageType,double> LocalInterpolatorType;
+            typename LocalInterpolatorType::Pointer fixedInterpolator = LocalInterpolatorType::New();
+            fixedInterpolator->SetInputImage(this->GetReferenceImage());
+            tmpMetric->SetFixedInterpolator(fixedInterpolator);
+
+            PointType tmpPoint;
+            tmpPoint.Fill(0.0);
+            BaseInputTransformPointer tmpTrsf = this->GetNewBlockTransform(tmpPoint);
+            tmpMetric->SetReverseTransform(tmpTrsf);
+            tmpMetric->SetExtraMiddleImage(m_ExtraMiddleImage);
+            tmpMetric->SetUseOppositeTransform(true);
+
+            metric = tmpMetric;
+            break;
+        }
+
         case MeanSquares:
         default:
         {
@@ -81,7 +180,7 @@ DistortionCorrectionBlockMatcher<TInputImageType>
             typename LocalMetricType::Pointer tmpMetric = LocalMetricType::New();
             tmpMetric->SetScaleIntensities(true);
 
-            metric = LocalMetricType::New();
+            metric = tmpMetric;
             break;
         }
     }
@@ -169,13 +268,22 @@ DistortionCorrectionBlockMatcher<TInputImageType>
             similarityWeight = (val + 1) / 2.0;
 
         case SquaredCorrelation:
+        case SymmetricCorrelation:
         default:
             similarityWeight = val;
     }
 
     // Structure weight
     std::vector <double> localGradient(InputImageType::ImageDimension,0);
-    itk::ImageRegionConstIterator <InputImageType> fixedItr(this->GetReferenceImage(),this->GetBlockRegion(block));
+
+    // Handle on which image has the weight to be computed depending on the mode
+    InputImageType *refImWeight = this->GetReferenceImage();
+    if (m_ExtraMiddleImage)
+        refImWeight = m_ExtraMiddleImage;
+    else if (m_ArtificialMiddleImage)
+        refImWeight = m_ArtificialMiddleImage;
+
+    itk::ImageRegionConstIterator <InputImageType> fixedItr(refImWeight,this->GetBlockRegion(block));
     typedef typename InputImageType::RegionType ImageRegionType;
     typename ImageRegionType::IndexType currentIndex, modifiedIndex;
 
@@ -250,11 +358,21 @@ DistortionCorrectionBlockMatcher<TInputImageType>
     InternalMetricType *tmpMetric = dynamic_cast <InternalMetricType *> (metric.GetPointer());
     tmpMetric->SetFixedImageRegion(this->GetBlockRegion(block));
     tmpMetric->SetTransform(this->GetBlockTransformPointer(block));
+
+    if (m_SimilarityType == SymmetricCorrelation)
+    {
+        this->GetBlockTransformPointer(block)->Clone();
+        typedef anima::SymmetricCorrelationImageToImageMetric <InputImageType,InputImageType> LocalMetricType;
+        LocalMetricType *tmpMetric = dynamic_cast <LocalMetricType *> (metric.GetPointer());
+        BaseInputTransformPointer reverseTrsf = this->GetNewBlockTransform(this->GetBlockPosition(block));
+        tmpMetric->SetReverseTransform(reverseTrsf);
+    }
+
     tmpMetric->Initialize();
 
-    if (m_SimilarityType != MeanSquares)
+    if ((m_SimilarityType == Correlation)||(m_SimilarityType == SquaredCorrelation))
         ((anima::FastCorrelationImageToImageMetric<InputImageType, InputImageType> *)metric.GetPointer())->PreComputeFixedValues();
-    else
+    else if (m_SimilarityType == MeanSquares)
         ((anima::FastMeanSquaresImageToImageMetric<InputImageType, InputImageType> *)metric.GetPointer())->PreComputeFixedValues();
 }
 
@@ -270,7 +388,6 @@ DistortionCorrectionBlockMatcher<TInputImageType>
     LocalOptimizerType::ScalesType tmpScales(this->GetBlockTransformPointer(0)->GetNumberOfParameters());
     LocalOptimizerType::ScalesType lowerBounds(this->GetBlockTransformPointer(0)->GetNumberOfParameters());
     LocalOptimizerType::ScalesType upperBounds(this->GetBlockTransformPointer(0)->GetNumberOfParameters());
-    typename InputImageType::SpacingType fixedSpacing = this->GetReferenceImage()->GetSpacing();
 
     // Scale factor to ensure that max translations and skew can be reached
     // Based on the fact that non diagonal terms log is a = x * log(y) / (exp(y) - 1)

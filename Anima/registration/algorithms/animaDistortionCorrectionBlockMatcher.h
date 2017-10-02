@@ -11,11 +11,14 @@ public:
     DistortionCorrectionBlockMatcher();
     virtual ~DistortionCorrectionBlockMatcher() {}
 
+    // To do: Contains symmetric correlation for now. Normally should be deduced from the rest
+    // (attraction mode or extra middle image)
     enum SimilarityDefinition
     {
         MeanSquares = 0,
         Correlation,
-        SquaredCorrelation
+        SquaredCorrelation,
+        SymmetricCorrelation
     };
 
     enum TransformDefinition
@@ -27,13 +30,14 @@ public:
 
     typedef BaseBlockMatcher <TInputImageType> Superclass;
     typedef typename Superclass::InputImageType InputImageType;
+    typedef typename Superclass::InputImagePointer InputImagePointer;
     typedef typename Superclass::PointType PointType;
     typedef typename Superclass::AgregatorType AgregatorType;
     typedef typename Superclass::MetricPointer MetricPointer;
     typedef typename Superclass::BaseInputTransformPointer BaseInputTransformPointer;
     typedef typename Superclass::OptimizerPointer OptimizerPointer;
 
-    typename AgregatorType::TRANSFORM_TYPE GetAgregatorInputTransformType();
+    typename AgregatorType::TRANSFORM_TYPE GetAgregatorInputTransformType() ITK_OVERRIDE;
     void SetBlockTransformType(TransformDefinition val) {m_BlockTransformType = val;}
     TransformDefinition &GetBlockTransformType() {return m_BlockTransformType;}
 
@@ -46,21 +50,33 @@ public:
 
     void SetTransformDirection(unsigned int val) {m_TransformDirection = val;}
 
-    bool GetMaximizedMetric();
+    //! Set extra middle image used as target
+    void SetExtraMiddleImage(InputImageType *image) {m_ExtraMiddleImage = image;}
+    void SetAttractorMode(bool mode) {m_AttractorMode = mode;}
+
+    bool GetMaximizedMetric() ITK_OVERRIDE;
     void SetSimilarityType(SimilarityDefinition val) {m_SimilarityType = val;}
 
 protected:
-    virtual BaseInputTransformPointer GetNewBlockTransform(PointType &blockCenter);
+    virtual BaseInputTransformPointer GetNewBlockTransform(PointType &blockCenter) ITK_OVERRIDE;
 
-    virtual MetricPointer SetupMetric();
-    virtual double ComputeBlockWeight(double val, unsigned int block);
+    void InitializeBlocks() ITK_OVERRIDE;
+    virtual MetricPointer SetupMetric() ITK_OVERRIDE;
+    virtual double ComputeBlockWeight(double val, unsigned int block) ITK_OVERRIDE;
 
-    virtual void BlockMatchingSetup(MetricPointer &metric, unsigned int block);
-    virtual void TransformDependantOptimizerSetup(OptimizerPointer &optimizer);
+    virtual void BlockMatchingSetup(MetricPointer &metric, unsigned int block) ITK_OVERRIDE;
+    virtual void TransformDependantOptimizerSetup(OptimizerPointer &optimizer) ITK_OVERRIDE;
 
 private:
     SimilarityDefinition m_SimilarityType;
     TransformDefinition m_BlockTransformType;
+
+    //! Boolean handling attractor mode switch
+    bool m_AttractorMode;
+    //! External reference image for symmetric correlation
+    InputImagePointer m_ExtraMiddleImage;
+    //! Artificial middle image if we are working in attractor mode
+    InputImagePointer m_ArtificialMiddleImage;
 
     // Bobyqa radiuses
     double m_SearchSkewRadius;

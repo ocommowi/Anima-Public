@@ -19,6 +19,7 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::PyramidalDisto
 {
     m_BackwardImage = NULL;
     m_ForwardImage = NULL;
+    m_ExtraMiddleImage = 0;
     
     m_InitialTransform = NULL;
     
@@ -45,6 +46,7 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::PyramidalDisto
     m_Agregator = Baloo;
     m_TransformKind = DirectionScaleSkew;
     m_Metric = SquaredCorrelation;
+    m_AttractorMode = false;
     m_WeightedAgregation = false;
     m_ExtrapolationSigma = 3;
     m_ElasticSigma = 3;
@@ -82,6 +84,9 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::Update()
 {
     typedef typename anima::DistortionCorrectionBMRegistrationMethod<InputImageType> BlockMatchRegistrationType;
 
+    if ((m_ExtraMiddleImage || m_AttractorMode)&&(m_Metric == MeanSquares))
+        itkExceptionMacro("Attractor modes only support correlation right now");
+
     this->SetupPyramids();
 
     // Iterate over pyramid levels
@@ -95,6 +100,13 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::Update()
         
         typename InputImageType::Pointer forwardImage = m_ForwardPyramid->GetOutput(i);
         forwardImage->DisconnectPipeline();
+
+        typename InputImageType::Pointer extraImage = 0;
+        if (m_ExtraImagePyramid)
+        {
+            extraImage = m_ExtraImagePyramid->GetOutput(i);
+            extraImage->DisconnectPipeline();
+        }
         
         // Update fields to match the current resolution
         if (m_OutputTransform->GetParametersAsVectorField() != NULL)
@@ -159,6 +171,13 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::Update()
         // Init matcher
         typename BlockMatchRegistrationType::Pointer bmreg = BlockMatchRegistrationType::New();
 
+        if (extraImage)
+            bmreg->SetAttractionMode(BlockMatchRegistrationType::Targeted_Attraction);
+        else if (m_AttractorMode)
+            bmreg->SetAttractionMode(BlockMatchRegistrationType::Untargeted_Attraction);
+        else
+            bmreg->SetAttractionMode(BlockMatchRegistrationType::Symmetric);
+
         bmreg->SetNumberOfThreads(this->GetNumberOfThreads());
         
         typedef anima::ResampleImageFilter<InputImageType, InputImageType,
@@ -194,6 +213,12 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::Update()
         mainMatcher->SetBlockVarianceThreshold(GetStDevThreshold() * GetStDevThreshold());
         mainMatcher->SetUseTransformationDam(m_UseTransformationDam);
         mainMatcher->SetDamDistance(m_DamDistance * meanSpacing / 2.0);
+
+        mainMatcher->SetExtraMiddleImage(extraImage);
+        if (extraImage || m_AttractorMode)
+            mainMatcher->SetAttractorMode(true);
+        else
+            mainMatcher->SetAttractorMode(false);
 
         bmreg->SetBlockMatcher(mainMatcher);
 
@@ -236,7 +261,12 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::Update()
         bmreg->SetExponentiationOrder(m_ExponentiationOrder);
 
         mainMatcher->SetBlockTransformType((typename BlockMatcherType::TransformDefinition) m_TransformKind);
-        mainMatcher->SetSimilarityType((typename BlockMatcherType::SimilarityDefinition) m_Metric);
+
+        if (m_AttractorMode || m_ExtraMiddleImage.IsNotNull())
+            mainMatcher->SetSimilarityType(BlockMatcherType::SymmetricCorrelation);
+        else
+            mainMatcher->SetSimilarityType((typename BlockMatcherType::SimilarityDefinition) m_Metric);
+
         mainMatcher->SetOptimizerType(BlockMatcherType::Bobyqa);
 
         bmreg->SetSVFElasticRegSigma(m_ElasticSigma * meanSpacing);
@@ -401,6 +431,21 @@ PyramidalDistortionCorrectionBlockMatchingBridge<ImageDimension>::SetupPyramids(
     m_ForwardPyramid->SetImageResampler(forwardResampler);
 
     m_ForwardPyramid->Update();
+
+    // Create pyramid for extra image
+    if (m_ExtraMiddleImage)
+    {
+        m_ExtraImagePyramid = PyramidType::New();
+
+        m_ExtraImagePyramid->SetInput(m_ExtraMiddleImage);
+        m_ExtraImagePyramid->SetNumberOfLevels(m_NumberOfPyramidLevels);
+        m_ExtraImagePyramid->SetNumberOfThreads(this->GetNumberOfThreads());
+
+        typename ResampleFilterType::Pointer extraResampler = ResampleFilterType::New();
+        m_ExtraImagePyramid->SetImageResampler(extraResampler);
+
+        m_ExtraImagePyramid->Update();
+    }
 }
 
 } // end namespace anima

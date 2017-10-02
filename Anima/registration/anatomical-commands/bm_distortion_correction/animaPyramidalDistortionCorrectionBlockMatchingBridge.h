@@ -65,7 +65,8 @@ public:
      * */
     void SetBackwardImage(InputImageConstPointer backwardImage) {m_BackwardImage = backwardImage;}
     void SetForwardImage(InputImageConstPointer forwardImage) {m_ForwardImage = forwardImage;}
-    
+    void SetExtraMiddleImage(InputImagePointer middleImage) {m_ExtraMiddleImage = middleImage;}
+
     InputImagePointer GetOutputImage() {return m_OutputImage;}
     
     /**
@@ -154,10 +155,13 @@ public:
 
     double GetDamDistance() {return m_DamDistance;}
     void SetDamDistance(double damDistance) {m_DamDistance = damDistance;}
-    
+
+    bool GetAttractorMode() {return m_AttractorMode;}
+    void SetAttractorMode(bool mode) {m_AttractorMode = mode;}
+
     bool GetWeightedAgregation() {return m_WeightedAgregation;}
     void SetWeightedAgregation(bool WeightedAgregation) {m_WeightedAgregation=WeightedAgregation;}
-    
+
     unsigned int GetNumberOfPyramidLevels() {return m_NumberOfPyramidLevels;}
     void SetNumberOfPyramidLevels(unsigned int NumberOfPyramidLevels) {m_NumberOfPyramidLevels=NumberOfPyramidLevels;}
     
@@ -181,7 +185,11 @@ private:
 
     std::string m_outputTransformFile;
     std::string m_resultFile;
-    
+
+    bool m_AttractorMode;
+    InputImagePointer m_ExtraMiddleImage;
+    PyramidPointer m_ExtraImagePyramid;
+
     unsigned int m_TransformDirection;
     unsigned int m_BlockSize;
     unsigned int m_BlockSpacing;

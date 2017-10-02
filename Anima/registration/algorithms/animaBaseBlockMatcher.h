@@ -83,6 +83,7 @@ public:
     void Update();
 
     std::vector <PointType> &GetBlockPositions() {return m_BlockPositions;}
+    PointType &GetBlockPosition(unsigned int i) {return m_BlockPositions[i];}
     std::vector <ImageRegionType> &GetBlockRegions() {return m_BlockRegions;}
     ImageRegionType &GetBlockRegion(unsigned int i) {return m_BlockRegions[i];}
     DamWeightsImagePointer &GetBlockDamWeights() {return m_BlockDamWeights;}
