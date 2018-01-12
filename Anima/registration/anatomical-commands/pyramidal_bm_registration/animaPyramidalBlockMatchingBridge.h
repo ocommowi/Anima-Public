@@ -204,6 +204,9 @@ public:
     bool GetInitializeOnCenterOfGravity() {return m_InitializeOnCenterOfGravity;}
     void SetInitializeOnCenterOfGravity(bool initOnCenterOfGravity) {m_InitializeOnCenterOfGravity=initOnCenterOfGravity;}
 
+    bool GetAdaptBlocksToStructure() {return m_AdaptBlocksToStructure;}
+    void SetAdaptBlocksToStructure(bool val) {m_AdaptBlocksToStructure = val;}
+
     void SetBlockGenerationMask(MaskImageType *mask) {m_BlockGenerationMask = mask;}
 
     void SetVerbose(bool value) {m_Verbose = value;}
@@ -261,6 +264,7 @@ private:
     double m_PercentageKept;
     bool m_InitializeOnCenterOfGravity;
 
+    bool m_AdaptBlocksToStructure;
     bool m_Abort;
     bool m_Verbose;
 

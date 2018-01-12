@@ -29,6 +29,8 @@ public:
     bool GetMaximizedMetric();
     void SetSimilarityType(SimilarityDefinition val) {m_SimilarityType = val;}
 
+    void SetAdaptRegionToStructure(bool val) {m_AdaptRegionToStructure = val;}
+
 protected:
     virtual MetricPointer SetupMetric();
     virtual double ComputeBlockWeight(double val, unsigned int block);
@@ -37,6 +39,7 @@ protected:
 
 private:
     SimilarityDefinition m_SimilarityType;
+    bool m_AdaptRegionToStructure;
 };
 
 } // end namespace anima

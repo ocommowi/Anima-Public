@@ -20,30 +20,28 @@ public:
     typedef itk::SmartPointer<const Self>                        ConstPointer;
 
     /** Method for creation through the object factory. */
-    itkNewMacro(Self);
+    itkNewMacro(Self)
 
     /** Run-time type information (and related methods). */
-    itkTypeMacro(FastCorrelationImageToImageMetric, Object);
-
+    itkTypeMacro(FastCorrelationImageToImageMetric, Object)
 
     /** Types transferred from the base class */
-    typedef typename Superclass::RealType                 RealType;
-    typedef typename Superclass::TransformType            TransformType;
-    typedef typename Superclass::TransformPointer         TransformPointer;
-    typedef typename Superclass::TransformParametersType  TransformParametersType;
-    typedef typename Superclass::TransformJacobianType    TransformJacobianType;
-    typedef typename Superclass::GradientPixelType        GradientPixelType;
-    typedef typename Superclass::OutputPointType          OutputPointType;
-    typedef typename Superclass::InputPointType           InputPointType;
+    typedef typename Superclass::RealType RealType;
+    typedef typename Superclass::TransformType TransformType;
+    typedef typename Superclass::TransformPointer TransformPointer;
+    typedef typename Superclass::TransformParametersType TransformParametersType;
+    typedef typename Superclass::OutputPointType OutputPointType;
+    typedef typename Superclass::InputPointType InputPointType;
     typedef typename itk::ContinuousIndex <double,TFixedImage::ImageDimension> ContinuousIndexType;
 
-    typedef typename Superclass::MeasureType              MeasureType;
-    typedef typename Superclass::DerivativeType           DerivativeType;
-    typedef typename Superclass::FixedImageType           FixedImageType;
-    typedef typename Superclass::MovingImageType          MovingImageType;
-    typedef typename Superclass::FixedImageConstPointer   FixedImageConstPointer;
-    typedef typename Superclass::MovingImageConstPointer  MovingImageConstPointer;
-
+    typedef typename Superclass::MeasureType MeasureType;
+    typedef typename Superclass::DerivativeType DerivativeType;
+    typedef typename Superclass::FixedImageType FixedImageType;
+    typedef typename Superclass::MovingImageType MovingImageType;
+    typedef typename Superclass::FixedImageConstPointer FixedImageConstPointer;
+    typedef typename Superclass::MovingImageConstPointer MovingImageConstPointer;
+    typedef typename Superclass::InterpolatorType InterpolatorType;
+    typedef typename Superclass::InterpolatorPointer InterpolatorPointer;
 
     /** Get the derivatives of the match measure. */
     void GetDerivative(const TransformParametersType & parameters,
@@ -57,8 +55,9 @@ public:
                                MeasureType& Value, DerivativeType& Derivative) const ITK_OVERRIDE;
 
     void PreComputeFixedValues();
-    itkSetMacro(SquaredCorrelation, bool);
-    itkSetMacro(ScaleIntensities, bool);
+    itkSetMacro(SquaredCorrelation, bool)
+    itkSetMacro(ScaleIntensities, bool)
+    itkSetMacro(AdaptRegionToStructure, bool)
 
 protected:
     FastCorrelationImageToImageMetric();
@@ -74,6 +73,7 @@ private:
 
     bool m_SquaredCorrelation;
     bool m_ScaleIntensities;
+    bool m_AdaptRegionToStructure;
 
     std::vector <InputPointType> m_FixedImagePoints;
     std::vector <RealType> m_FixedImageValues;

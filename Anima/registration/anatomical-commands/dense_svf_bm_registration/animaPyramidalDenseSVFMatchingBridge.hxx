@@ -58,6 +58,7 @@ PyramidalDenseSVFMatchingBridge<ImageDimension>::PyramidalDenseSVFMatchingBridge
     m_NeighborhoodApproximation = 2.5;
     m_BCHCompositionOrder = 1;
     m_ExponentiationOrder = 1;
+    m_AdaptBlocksToStructure = false;
     m_UseTransformationDam = true;
     m_DamDistance = 2.5;
     m_NumberOfPyramidLevels = 3;
@@ -206,6 +207,7 @@ PyramidalDenseSVFMatchingBridge<ImageDimension>::Update()
         mainMatcher->SetBlockVarianceThreshold(GetStDevThreshold() * GetStDevThreshold());
         mainMatcher->SetBlockGenerationMask(maskGenerationImage);
         mainMatcher->SetUseTransformationDam(m_UseTransformationDam);
+        mainMatcher->SetAdaptRegionToStructure(m_AdaptBlocksToStructure);
         mainMatcher->SetDamDistance(m_DamDistance * meanSpacing / 2.0);
 
         switch (m_SymmetryType)
@@ -229,6 +231,7 @@ PyramidalDenseSVFMatchingBridge<ImageDimension>::Update()
                 reverseMatcher->SetBlockVarianceThreshold(GetStDevThreshold() * GetStDevThreshold());
                 reverseMatcher->SetBlockGenerationMask(maskGenerationImage);
                 reverseMatcher->SetUseTransformationDam(m_UseTransformationDam);
+                reverseMatcher->SetAdaptRegionToStructure(m_AdaptBlocksToStructure);
                 reverseMatcher->SetDamDistance(m_DamDistance * meanSpacing / 2.0);
                 reverseMatcher->SetVerbose(m_Verbose);
 

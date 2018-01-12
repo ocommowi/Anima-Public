@@ -16,6 +16,7 @@ AnatomicalBlockMatcher<TInputImageType>
 ::AnatomicalBlockMatcher()
 {
     m_SimilarityType = SquaredCorrelation;
+    m_AdaptRegionToStructure = false;
 }
 
 template <typename TInputImageType>
@@ -44,6 +45,7 @@ AnatomicalBlockMatcher<TInputImageType>
             typedef anima::FastCorrelationImageToImageMetric <InputImageType,InputImageType> LocalMetricType;
 
             typename LocalMetricType::Pointer tmpMetric = LocalMetricType::New();
+            tmpMetric->SetAdaptRegionToStructure(m_AdaptRegionToStructure);
             tmpMetric->SetSquaredCorrelation(m_SimilarityType == SquaredCorrelation);
 
             metric = tmpMetric;

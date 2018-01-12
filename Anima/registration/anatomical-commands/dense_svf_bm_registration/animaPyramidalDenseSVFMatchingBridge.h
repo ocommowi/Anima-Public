@@ -222,6 +222,9 @@ public:
     double GetPercentageKept() {return m_PercentageKept;}
     void SetPercentageKept(double PercentageKept) {m_PercentageKept=PercentageKept;}
 
+    bool GetAdaptBlocksToStructure() {return m_AdaptBlocksToStructure;}
+    void SetAdaptBlocksToStructure(bool val) {m_AdaptBlocksToStructure = val;}
+
     void SetBlockGenerationMask(MaskImageType *mask) {m_BlockGenerationMask = mask;}
 
     void SetVerbose(bool value) {m_Verbose = value;}
@@ -277,6 +280,7 @@ private:
     unsigned int m_BCHCompositionOrder;
     unsigned int m_ExponentiationOrder;
 
+    bool m_AdaptBlocksToStructure;
     bool m_UseTransformationDam;
     double m_DamDistance;
 

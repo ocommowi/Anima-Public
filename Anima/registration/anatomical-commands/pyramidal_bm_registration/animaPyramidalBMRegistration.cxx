@@ -46,6 +46,7 @@ int main(int argc, const char** argv)
 
     TCLAP::ValueArg<unsigned int> optimizerMaxIterationsArg("","oi","Maximum iterations for local optimizer (default: 100)",false,100,"maximum local optimizer iterations",cmd);
     TCLAP::SwitchArg initIdentityArg("I","init-identity", "If no input transformation is given, initialize to identity (otherwise uses center of mass alignment)", cmd, false);
+    TCLAP::SwitchArg adaptBlocksToStructArg("A","adapt-blocks", "Adapt blocks shapes to image structure", cmd, false);
 
     TCLAP::ValueArg<double> searchRadiusArg("","sr","Search radius in pixels (exhaustive search window, rho start for bobyqa, default: 2)",false,2,"optimizer search radius",cmd);
     TCLAP::ValueArg<double> searchAngleRadiusArg("","sar","Search angle radius in degrees (rho start for bobyqa, default: 5)",false,5,"optimizer search angle radius",cmd);
@@ -103,6 +104,7 @@ int main(int argc, const char** argv)
     matcher->SetSeStoppingThreshold( seStoppingThresholdArg.getValue() );
     matcher->SetNumberOfPyramidLevels( numPyramidLevelsArg.getValue() );
     matcher->SetLastPyramidLevel( lastPyramidLevelArg.getValue() );
+    matcher->SetAdaptBlocksToStructure(adaptBlocksToStructArg.getValue());
 
     if (blockMaskArg.getValue() != "")
         matcher->SetBlockGenerationMask(anima::readImage<PyramidBMType::MaskImageType>(blockMaskArg.getValue()));

@@ -61,6 +61,7 @@ PyramidalBlockMatchingBridge<ImageDimension>::PyramidalBlockMatchingBridge()
     m_LastPyramidLevel = 0;
     m_PercentageKept = 0.8;
     m_InitializeOnCenterOfGravity = true;
+    m_AdaptBlocksToStructure = false;
 
     this->SetNumberOfThreads(itk::MultiThreader::GetGlobalDefaultNumberOfThreads());
 
@@ -154,6 +155,7 @@ void PyramidalBlockMatchingBridge<ImageDimension>::Update()
         mainMatcher->SetBlockSpacing(GetBlockSpacing());
         mainMatcher->SetBlockVarianceThreshold(GetStDevThreshold() * GetStDevThreshold());
         mainMatcher->SetBlockGenerationMask(maskGenerationImage);
+        mainMatcher->SetAdaptRegionToStructure(m_AdaptBlocksToStructure);
 
         if (m_Verbose)
         {
@@ -183,6 +185,7 @@ void PyramidalBlockMatchingBridge<ImageDimension>::Update()
                 reverseMatcher->SetBlockVarianceThreshold(GetStDevThreshold() * GetStDevThreshold());
                 reverseMatcher->SetVerbose(m_Verbose);
                 reverseMatcher->SetBlockGenerationMask(maskGenerationImage);
+                reverseMatcher->SetAdaptRegionToStructure(m_AdaptBlocksToStructure);
 
                 tmpReg->SetReverseBlockMatcher(reverseMatcher);
                 m_bmreg = tmpReg;

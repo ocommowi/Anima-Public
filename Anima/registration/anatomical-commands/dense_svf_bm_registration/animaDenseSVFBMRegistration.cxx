@@ -56,6 +56,7 @@ int main(int argc, const char** argv)
     TCLAP::ValueArg<unsigned int> bchOrderArg("b","bch-order","BCH composition order (default: 1)",false,1,"BCH order",cmd);
     TCLAP::ValueArg<unsigned int> expOrderArg("e","exp-order","Order of field exponentiation approximation (in between 0 and 1, default: 0)",false,0,"exponentiation order",cmd);
 
+    TCLAP::SwitchArg adaptBlocksToStructArg("A","adapt-blocks", "Adapt blocks shapes to image structure", cmd, false);
     TCLAP::SwitchArg useTransformDamArg("D","use-dam", "Activate transformation dam to force identity far away from any blocks", cmd, false);
     TCLAP::ValueArg<double> damDistanceArg("","dd","Distance of the deformation dam (crushes extrapolated displacements away from anything on a dd pixels distance, default: 3.0)",false,3.0,"identity dam distance",cmd);
 
@@ -117,8 +118,9 @@ int main(int argc, const char** argv)
     matcher->SetExponentiationOrder(expOrderArg.getValue());
     matcher->SetUseTransformationDam(useTransformDamArg.isSet());
     matcher->SetDamDistance(damDistanceArg.getValue());
-    matcher->SetNumberOfPyramidLevels( numPyramidLevelsArg.getValue() );
-    matcher->SetLastPyramidLevel( lastPyramidLevelArg.getValue() );
+    matcher->SetNumberOfPyramidLevels(numPyramidLevelsArg.getValue());
+    matcher->SetLastPyramidLevel(lastPyramidLevelArg.getValue());
+    matcher->SetAdaptBlocksToStructure(adaptBlocksToStructArg.getValue());
 
     if (blockMaskArg.getValue() != "")
         matcher->SetBlockGenerationMask(anima::readImage<PyramidBMType::MaskImageType>(blockMaskArg.getValue()));
