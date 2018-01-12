@@ -137,10 +137,10 @@ SplitAffine3DTransform<TScalarType>
     for (unsigned int i = 0;i < InputSpaceDimension;++i)
         angles[i] = m_FirstAngle[i];
 
-    vnl_matrix <TScalarType> firstRotationMatrix;
+    vnl_matrix <TScalarType> firstRotationMatrix(InputSpaceDimension,InputSpaceDimension);
     anima::Get3DRotationExponential(angles,firstRotationMatrix);
 
-    vnl_matrix <TScalarType> scaleMatrix;
+    vnl_matrix <TScalarType> scaleMatrix(InputSpaceDimension,InputSpaceDimension);
     scaleMatrix.set_identity();
     for (unsigned int i = 0;i < InputSpaceDimension;++i)
         scaleMatrix(i,i) = std::exp(m_LogScale[i]);
@@ -148,7 +148,7 @@ SplitAffine3DTransform<TScalarType>
     for (unsigned int i = 0;i < InputSpaceDimension;++i)
         angles[i] = m_SecondAngle[i];
 
-    vnl_matrix <TScalarType> secondRotationMatrix;
+    vnl_matrix <TScalarType> secondRotationMatrix(InputSpaceDimension,InputSpaceDimension);
     anima::Get3DRotationExponential(angles,secondRotationMatrix);
 
     MatrixType varMatrix = firstRotationMatrix * scaleMatrix * secondRotationMatrix;
