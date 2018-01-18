@@ -211,7 +211,7 @@ FastCorrelationImageToImageMetric<TFixedImage,TMovingImage>
         {
             double minEig = eigVals[0];
             for (unsigned int i = 0;i < dim;++i)
-                eigVals[i] = minEig / eigVals[i];
+                eigVals[i] = std::sqrt(minEig / eigVals[i]);
         }
         else
         {
@@ -224,31 +224,12 @@ FastCorrelationImageToImageMetric<TFixedImage,TMovingImage>
             volumeTensor *= eigVals[i];
 
         volumeTensor = std::pow(volumeTensor, 1.0 / dim);
-        double constProd = 1.0;
-        double variableProd = 1.0;
-        unsigned int numConst = 0;
 
         for (unsigned int i = 0;i < dim;++i)
         {
-            double constMinScale = 2.0 / (this->GetFixedImageRegion().GetSize()[i]);
-            eigVals[i] = std::max(constMinScale,eigVals[i] / volumeTensor);
-            if (eigVals[i] == constMinScale)
-            {
-                constProd *= constMinScale;
-                ++numConst;
-            }
-            else
-                variableProd *= eigVals[i];
-        }
-
-        if (constProd != 1.0)
-            variableProd = std::pow(constProd * variableProd, - 1.0 / (dim - numConst));
-
-        for (unsigned int i = 0;i < dim;++i)
-        {
-            double constMinScale = 2.0 / (this->GetFixedImageRegion().GetSize()[i]);
-            if (eigVals[i] != constMinScale)
-                eigVals[i] *= variableProd;
+            double constMinScale = 4.0 / (this->GetFixedImageRegion().GetSize()[i]);
+            double constMaxScale = 1.0 / constMinScale;
+            eigVals[i] = std::min(constMaxScale,std::max(constMinScale,eigVals[i] / volumeTensor));
         }
 
         // Now compute transformation of the block (voxel transform)
@@ -257,7 +238,7 @@ FastCorrelationImageToImageMetric<TFixedImage,TMovingImage>
         std::vector <double> baseTranslation(dim);
 
         for (unsigned int i = 0;i < dim;++i)
-            centralPoint[i] = this->GetFixedImageRegion().GetIndex()[i] + (this->GetFixedImageRegion().GetSize()[i] - 1) / 2.0;;
+            centralPoint[i] = this->GetFixedImageRegion().GetIndex()[i] + (this->GetFixedImageRegion().GetSize()[i] - 1) / 2.0;
 
         for (unsigned int i = 0;i < dim;++i)
         {
@@ -286,7 +267,6 @@ FastCorrelationImageToImageMetric<TFixedImage,TMovingImage>
             }
 
             fixedImage->TransformContinuousIndexToPhysicalPoint(continuousIndex, inputPoint);
-
             m_FixedImagePoints[pos] = inputPoint;
 
             fixedValue = 0.0;

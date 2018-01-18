@@ -111,7 +111,7 @@ StructureTensorImageFilter <TInputPixelType, TOutputScalarType, Dimension>
             {
                 double minEig = eigVals[0];
                 for (unsigned int i = 0;i < Dimension;++i)
-                    eigVals[i] = minEig / eigVals[i];
+                    eigVals[i] = std::sqrt(minEig / eigVals[i]);
             }
             else
             {
@@ -124,32 +124,11 @@ StructureTensorImageFilter <TInputPixelType, TOutputScalarType, Dimension>
                 volumeTensor *= eigVals[i];
 
             volumeTensor = std::pow(volumeTensor, 1.0 / 3);
-            double constProd = 1.0;
-            double variableProd = 1.0;
-            unsigned int numConst = 0;
 
-            double constMinScale = 2.0 / (2.0 * m_Neighborhood + 1.0);
+            double constMinScale = 4.0 / (2.0 * m_Neighborhood + 1.0);
+            double constMaxScale = 1.0 / constMinScale;
             for (unsigned int i = 0;i < Dimension;++i)
-            {
-                eigVals[i] = std::max(constMinScale,eigVals[i] / volumeTensor);
-                if (eigVals[i] == constMinScale)
-                {
-                    constProd *= constMinScale;
-                    ++numConst;
-                }
-                else
-                    variableProd *= eigVals[i];
-            }
-
-            if (constProd != 1.0)
-                variableProd = std::pow(constProd * variableProd, - 1.0 / (Dimension - numConst));
-
-
-            for (unsigned int i = 0;i < Dimension;++i)
-            {
-                if (eigVals[i] != constMinScale)
-                    eigVals[i] *= variableProd;
-            }
+                eigVals[i] = std::min(constMaxScale,std::max(constMinScale,eigVals[i] / volumeTensor));
 
             anima::RecomposeTensor(eigVals,eigVecs,structureTensor);
         }
