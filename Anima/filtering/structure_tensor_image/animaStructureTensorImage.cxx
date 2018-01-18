@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 
     TCLAP::SwitchArg realCoordsArg("R","real","Compute structure tensors in real coordinates (default: voxel ones)",cmd);
     TCLAP::SwitchArg normalizeArg("N","normalize","Normalize structure tensors",cmd);
-    TCLAP::ValueArg<unsigned int> neighArg("n","neigh","Neighborhood size for tensor computation (default: 1)",false,1,"neighborhood size",cmd);
+    TCLAP::ValueArg<unsigned int> neighArg("n","neigh","Neighborhood size for tensor computation (default: 2)",false,2,"neighborhood size",cmd);
 
     TCLAP::ValueArg <unsigned int> nbpArg("T","numberofthreads","Number of threads to run on (default : all cores)",false,itk::MultiThreader::GetGlobalDefaultNumberOfThreads(),"number of threads",cmd);
 
