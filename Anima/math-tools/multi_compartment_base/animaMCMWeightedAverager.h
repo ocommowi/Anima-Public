@@ -45,6 +45,7 @@ public:
     void SetInputModels(std::vector <MCMPointer> &models) {m_InputModels = models; m_UpToDate = false;}
     void SetInputWeights(std::vector <double> &weights) {m_InputWeights = weights; m_UpToDate = false;}
 
+    void SetTensorInterpolationMethod(unsigned int method);
     void SetNumberOfOutputDirectionalCompartments(unsigned int val);
     void ResetNumberOfOutputDirectionalCompartments();
 
@@ -62,15 +63,20 @@ protected:
     MCMWeightedAverager();
     ~MCMWeightedAverager() {}
 
-    void ComputeTensorDistanceMatrix();
+    void ComputeTensorLEDistanceMatrix();
+    void ComputeTensorBayesDistanceMatrix();
     virtual void ComputeNonTensorDistanceMatrix();
 
-    void ComputeOutputTensorCompatibleModel();
+    void ComputeOutputLETensorModel();
+    void ComputeOutputBayesTensorModel();
     virtual void ComputeOutputNonTensorModel();
 
 private:
     std::vector <MCMPointer> m_InputModels;
     std::vector <double> m_InputWeights;
+
+    // 0 is log-euclidean, 1 is Bayes
+    unsigned int m_TensorInterpolationMethod;
 
     unsigned int m_NumberOfOutputDirectionalCompartments;
 
@@ -80,6 +86,7 @@ private:
 protected:
     // Internal work variables
     std::vector < itk::VariableLengthVector <double> > m_InternalLogTensors;
+    std::vector < vnl_matrix <double> > m_InternalInvertedTensors;
 
     std::vector <double> m_InternalOutputWeights;
     std::vector <MCMCompartmentPointer> m_WorkCompartmentsVector;
@@ -94,6 +101,8 @@ protected:
     EigenAnalysisType m_InternalEigenAnalyzer;
     LECalculatorPointer m_leCalculator;
     SpectralClusterType m_InternalSpectralCluster;
+
+    static const vnl_matrix<double> m_ReferenceSigma;
 };
 
 } // end namespace anima

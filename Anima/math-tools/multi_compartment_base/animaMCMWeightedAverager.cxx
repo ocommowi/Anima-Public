@@ -3,9 +3,12 @@
 namespace anima
 {
 
+const vnl_matrix<double> MCMWeightedAverager::m_ReferenceSigma = vnl_diag_matrix<double>(3,3.0e-3);
+
 MCMWeightedAverager::MCMWeightedAverager()
 {
     m_UpToDate = false;
+    m_TensorInterpolationMethod = 0;
     m_NumberOfOutputDirectionalCompartments = 3;
     m_InternalEigenAnalyzer.SetDimension(3);
     m_InternalEigenAnalyzer.SetOrder(3);
@@ -21,6 +24,15 @@ void MCMWeightedAverager::SetOutputModel(MCMType *model)
 {
     m_OutputModel = model->Clone();
     this->ResetNumberOfOutputDirectionalCompartments();
+}
+
+void MCMWeightedAverager::SetTensorInterpolationMethod(unsigned int method)
+{
+    if (m_TensorInterpolationMethod == method)
+        return;
+
+    m_TensorInterpolationMethod = method;
+    m_UpToDate = false;
 }
 
 void MCMWeightedAverager::SetNumberOfOutputDirectionalCompartments(unsigned int val)
@@ -78,30 +90,65 @@ void MCMWeightedAverager::Update()
     m_InternalOutputWeights.resize(m_OutputModel->GetNumberOfCompartments());
     std::fill(m_InternalOutputWeights.begin(),m_InternalOutputWeights.end(),0.0);
 
+    vnl_matrix <double> meanMatrix(3,3), workIsoMatrix(3,3);
     for (unsigned int i = 0;i < numIsoCompartments;++i)
     {
-        double outputLogDiffusivity = 0;
-        double outputRadius = 0.0;
-        double sumWeights = 0;
-        for (unsigned int j = 0;j < numInputs;++j)
+        if (m_TensorInterpolationMethod == 0)
         {
-            if (m_InputWeights[j] <= 0)
-                continue;
+            double outputLogDiffusivity = 0;
+            double outputRadius = 0.0;
+            double sumWeights = 0;
+            for (unsigned int j = 0;j < numInputs;++j)
+            {
+                if (m_InputWeights[j] <= 0)
+                    continue;
 
-            double tmpWeight = m_InputModels[j]->GetCompartmentWeight(i);
-            if (tmpWeight <= 0)
-                continue;
+                double tmpWeight = m_InputModels[j]->GetCompartmentWeight(i);
+                if (tmpWeight <= 0)
+                    continue;
 
-            m_InternalOutputWeights[i] += m_InputWeights[j] * tmpWeight;
-            outputLogDiffusivity += m_InputWeights[j] * std::log(m_InputModels[j]->GetCompartment(i)->GetAxialDiffusivity());
-            outputRadius += m_InputWeights[j] * m_InputModels[j]->GetCompartment(i)->GetTissueRadius();
-            sumWeights += m_InputWeights[j];
+                m_InternalOutputWeights[i] += m_InputWeights[j] * tmpWeight;
+                outputLogDiffusivity += m_InputWeights[j] * std::log(m_InputModels[j]->GetCompartment(i)->GetAxialDiffusivity());
+                outputRadius += m_InputWeights[j] * m_InputModels[j]->GetCompartment(i)->GetTissueRadius();
+                sumWeights += m_InputWeights[j];
+            }
+
+            if (sumWeights > 0)
+            {
+                m_OutputModel->GetCompartment(i)->SetAxialDiffusivity(std::exp(outputLogDiffusivity / sumWeights));
+                m_OutputModel->GetCompartment(i)->SetTissueRadius(outputRadius / sumWeights);
+            }
         }
-
-        if (sumWeights > 0)
+        else
         {
-            m_OutputModel->GetCompartment(i)->SetAxialDiffusivity(std::exp(outputLogDiffusivity / sumWeights));
-            m_OutputModel->GetCompartment(i)->SetTissueRadius(outputRadius / sumWeights);
+            // Bayes interpolation of isotropic compartments
+            double sumWeights = 0;
+            for (unsigned int j = 0;j < numInputs;++j)
+            {
+                if ((m_InputWeights[j] > 0) && (m_InputModels[j]->GetCompartmentWeight(i) > 0))
+                    sumWeights += 1.0;
+            }
+
+            meanMatrix = m_ReferenceSigma;
+            for (unsigned int j = 0;j < numInputs;++j)
+            {
+                if (m_InputWeights[j] <= 0)
+                    continue;
+
+                double tmpWeight = m_InputModels[j]->GetCompartmentWeight(i);
+                if (tmpWeight <= 0)
+                    continue;
+
+                m_InternalOutputWeights[i] += m_InputWeights[j] * tmpWeight;
+
+                workIsoMatrix = m_InputModels[j]->GetCompartment(i)->GetDiffusionTensor().GetVnlMatrix().as_matrix();
+                anima::GetTensorPower(workIsoMatrix,workIsoMatrix,-1.0);
+                workIsoMatrix = anima::GetZeroMeanGaussianScalarMultiplication(workIsoMatrix,1.0 / sumWeights,m_ReferenceSigma);
+                meanMatrix = anima::GetZeroMeanGaussianAddition(meanMatrix,workIsoMatrix,m_ReferenceSigma);
+            }
+
+            if (sumWeights > 0)
+                m_OutputModel->GetCompartment(i)->SetAxialDiffusivity(1.0 / meanMatrix(0,0));
         }
     }
 
@@ -147,7 +194,12 @@ void MCMWeightedAverager::Update()
 
     bool tensorCompatibility = m_WorkCompartmentsVector[0]->GetTensorCompatible();
     if (tensorCompatibility)
-        this->ComputeTensorDistanceMatrix();
+    {
+        if (m_TensorInterpolationMethod == 0)
+            this->ComputeTensorLEDistanceMatrix();
+        else
+            this->ComputeTensorBayesDistanceMatrix();
+    }
     else
         this->ComputeNonTensorDistanceMatrix();
 
@@ -163,7 +215,12 @@ void MCMWeightedAverager::Update()
         m_InternalSpectralMemberships[i] = m_InternalSpectralCluster.GetClassesMembership(i);
 
     if (tensorCompatibility)
-        this->ComputeOutputTensorCompatibleModel();
+    {
+        if (m_TensorInterpolationMethod == 0)
+            this->ComputeOutputLETensorModel();
+        else
+            this->ComputeOutputBayesTensorModel();
+    }
     else
         this->ComputeOutputNonTensorModel();
 
@@ -172,7 +229,7 @@ void MCMWeightedAverager::Update()
     m_UpToDate = true;
 }
 
-void MCMWeightedAverager::ComputeTensorDistanceMatrix()
+void MCMWeightedAverager::ComputeTensorLEDistanceMatrix()
 {
     unsigned int numCompartments = m_WorkCompartmentsVector.size();
     m_InternalLogTensors.resize(numCompartments);
@@ -199,12 +256,40 @@ void MCMWeightedAverager::ComputeTensorDistanceMatrix()
         }
 }
 
+void MCMWeightedAverager::ComputeTensorBayesDistanceMatrix()
+{
+    unsigned int numCompartments = m_WorkCompartmentsVector.size();
+    m_InternalInvertedTensors.resize(numCompartments);
+
+    vnl_matrix <double> workMatrix(3,3);
+    for (unsigned int i = 0;i < numCompartments;++i)
+    {
+        workMatrix = m_WorkCompartmentsVector[i]->GetDiffusionTensor().GetVnlMatrix().as_matrix();
+        anima::GetTensorPower(workMatrix,m_InternalInvertedTensors[i],-1.0);
+    }
+
+    m_InternalDistanceMatrix.set_size(numCompartments,numCompartments);
+    m_InternalDistanceMatrix.fill(0);
+
+    for (unsigned int i = 0;i < numCompartments;++i)
+    {
+        for (unsigned int j = i+1;j < numCompartments;++j)
+        {
+            double distValue = anima::GetZeroMeanGaussianSquaredDistance(m_InternalInvertedTensors[i],
+                                                                         m_InternalInvertedTensors[j],
+                                                                         3.0e-3);
+            m_InternalDistanceMatrix(i,j) = distValue;
+            m_InternalDistanceMatrix(j,i) = m_InternalDistanceMatrix(i,j);
+        }
+    }
+}
+
 void MCMWeightedAverager::ComputeNonTensorDistanceMatrix()
 {
     itkExceptionMacro("No non-tensor distance matrix implemented in public version")
 }
 
-void MCMWeightedAverager::ComputeOutputTensorCompatibleModel()
+void MCMWeightedAverager::ComputeOutputLETensorModel()
 {
     unsigned int numCompartments = m_WorkCompartmentsVector.size();
     unsigned int numIsoCompartments = m_OutputModel->GetNumberOfIsotropicCompartments();
@@ -274,6 +359,50 @@ void MCMWeightedAverager::ComputeOutputTensorCompatibleModel()
 
         anima::BaseCompartment *workCompartment = m_OutputModel->GetCompartment(i+numIsoCompartments);
         workCompartment->SetCompartmentVector(m_InternalOutputVector);
+    }
+}
+
+void MCMWeightedAverager::ComputeOutputBayesTensorModel()
+{
+    unsigned int numCompartments = m_WorkCompartmentsVector.size();
+    unsigned int numIsoCompartments = m_OutputModel->GetNumberOfIsotropicCompartments();
+    unsigned int numberOfOutputCompartments = m_InternalSpectralMemberships[0].size();
+
+    itk::VariableLengthVector <double> outputVector(6);
+    vnl_matrix <double> workMatrix(3,3), meanMatrix(3,3);
+
+    for (unsigned int i = 0;i < numberOfOutputCompartments;++i)
+    {
+        outputVector.Fill(0);
+        meanMatrix = m_ReferenceSigma;
+
+        double sumWeights = 0;
+        for (unsigned int j = 0;j < numCompartments;++j)
+        {
+            if (m_WorkCompartmentWeights[j] * m_InternalSpectralMemberships[j][i] > 0)
+                sumWeights += m_InternalSpectralMemberships[j][i];
+        }
+
+        double totalWeights = 0;
+        for (unsigned int j = 0;j < numCompartments;++j)
+        {
+            double weight = m_WorkCompartmentWeights[j] * m_InternalSpectralMemberships[j][i];
+            if (weight == 0)
+                continue;
+
+            totalWeights += weight;
+
+            workMatrix = anima::GetZeroMeanGaussianScalarMultiplication(m_InternalInvertedTensors[j],m_InternalSpectralMemberships[j][i] / sumWeights,m_ReferenceSigma);
+            meanMatrix = anima::GetZeroMeanGaussianAddition(meanMatrix,workMatrix,m_ReferenceSigma);
+        }
+
+        anima::GetTensorPower(meanMatrix,meanMatrix,-1.0);
+        anima::GetVectorRepresentation(meanMatrix,outputVector,6,false);
+
+        m_InternalOutputWeights[i+numIsoCompartments] = totalWeights;
+
+        anima::BaseCompartment *workCompartment = m_OutputModel->GetCompartment(i+numIsoCompartments);
+        workCompartment->SetCompartmentVector(outputVector);
     }
 }
 
