@@ -22,7 +22,8 @@ public:
     {
         Euclidean = 0,
         ApproximateSpherical,
-        Spherical
+        Spherical,
+        BayesTensors
     };
 
     FuzzyCMeansFilter();
@@ -31,14 +32,11 @@ public:
     void SetInputData(DataHolderType &data);
     void SetDataWeights(VectorType &val) {m_DataWeights = val;}
     void SetNbClass(unsigned int nbC) {m_NbClass = nbC;}
-    void SetFlagSpectralClustering(bool flag) {m_SpectralClusterInit = flag;}
+    void SetSpectralInitialization(bool flag) {m_SpectralInitialization = flag;}
     void SetMaxIterations(unsigned int mIt) {m_MaxIterations = mIt;}
     void SetRelStopCriterion(double rC) {m_RelStopCriterion = rC;}
     void SetMValue(double mV) {m_MValue = mV;}
-    void SetSphericalAverageType(CentroidAverageType spher) {m_SphericalAverageType = spher;}
-
-    void ComputeCentroids();
-    void UpdateMemberships();
+    void SetAverageType(CentroidAverageType spher) {m_AverageType = spher;}
 
     void InitializeCMeansFromData();
     void InitializeClassesMemberships(DataHolderType &classM);
@@ -51,6 +49,14 @@ public:
 
     VectorType &GetCentroid(unsigned int i) {return m_Centroids[i];}
     VectorType &GetClassesMembership(unsigned int i) {return m_ClassesMembership[i];}
+
+protected:
+    void ComputeCentroids();
+    void UpdateMemberships();
+
+    void ComputeBayesCentroid(unsigned int i);
+    void ComputeEuclideanCentroid(unsigned int i);
+    void ComputeSphericalCentroid(unsigned int i);
 
 private:
     long double computeDistance(VectorType &vec1, VectorType &vec2);
@@ -65,9 +71,9 @@ private:
     unsigned int m_MaxIterations;
 
     bool m_Verbose;
-    bool m_SpectralClusterInit;
+    bool m_SpectralInitialization;
 
-    CentroidAverageType m_SphericalAverageType;
+    CentroidAverageType m_AverageType;
 
     double m_RelStopCriterion;
     double m_MValue;
