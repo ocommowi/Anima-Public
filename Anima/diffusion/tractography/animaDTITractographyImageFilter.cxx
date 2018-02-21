@@ -27,7 +27,7 @@ void dtiTractographyImageFilter::SetInputImage(ModelImageType *input)
     m_DTIInterpolator->SetInputImage(this->GetInputImage());
 }
 
-bool dtiTractographyImageFilter::CheckModelCompatibility(VectorType &modelValue, itk::ThreadIdType threadId)
+void dtiTractographyImageFilter::GetScalarValues(const VectorType &modelValue, double &mdValue, double &faValue)
 {
     typedef vnl_matrix <double> MatrixType;
 
@@ -39,29 +39,35 @@ bool dtiTractographyImageFilter::CheckModelCompatibility(VectorType &modelValue,
     vnl_diag_matrix <double> eVals(3);
     EigenAnalysis.ComputeEigenValues(tmpMat,eVals);
 
-    double meanEvals = 0;
+    mdValue = 0;
     for (unsigned int i = 0;i < 3;++i)
     {
         eVals[i] = std::exp(eVals[i]);
-        meanEvals += eVals[i];
+        mdValue += eVals[i];
     }
 
-    meanEvals /= 3.0;
-
-    if (meanEvals > m_StopADCThreshold)
-        return false;
+    mdValue /= 3.0;
 
     double num = 0;
     double denom = 0;
     for (unsigned int i = 0;i < 3;++i)
     {
-        num += (eVals[i] - meanEvals) * (eVals[i] - meanEvals);
+        num += (eVals[i] - mdValue) * (eVals[i] - mdValue);
         denom += eVals[i] * eVals[i];
     }
 
-    double FAValue = std::sqrt(3.0 * num / (2.0 * denom));
+    faValue = std::sqrt(3.0 * num / (2.0 * denom));
+}
 
-    if (FAValue < m_StopFAThreshold)
+bool dtiTractographyImageFilter::CheckModelCompatibility(VectorType &modelValue, itk::ThreadIdType threadId)
+{
+    double mdValue, faValue;
+    this->GetScalarValues(modelValue, mdValue, faValue);
+
+    if (mdValue > m_StopADCThreshold)
+        return false;
+
+    if (faValue < m_StopFAThreshold)
         return false;
 
     return true;
@@ -72,8 +78,7 @@ bool dtiTractographyImageFilter::CheckIndexInImageBounds(ContinuousIndexType &in
     return m_DTIInterpolator->IsInsideBuffer(index);
 }
 
-void
-dtiTractographyImageFilter::GetModelValue(ContinuousIndexType &index, VectorType &modelValue)
+void dtiTractographyImageFilter::GetModelValue(ContinuousIndexType &index, VectorType &modelValue)
 {
     modelValue = m_DTIInterpolator->EvaluateAtContinuousIndex(index);
 }
@@ -176,12 +181,8 @@ void dtiTractographyImageFilter::ComputeAdditionalScalarMaps()
     PointType tmpPoint;
     DTIInterpolatorType::ContinuousIndexType tmpIndex;
 
-    typedef vnl_matrix <double> MatrixType;
-    MatrixType tmpMat(3,3);
-
-    vnl_diag_matrix <double> eVals(3);
-    itk::SymmetricEigenAnalysis <MatrixType,vnl_diag_matrix <double>,MatrixType> EigenAnalysis(3);
     VectorType tensorValue(6);
+    tensorValue.Fill(0.0);
 
     anima::LogEuclideanTensorCalculator <double>::Pointer leCalculator = anima::LogEuclideanTensorCalculator <double>::New();
 
@@ -191,7 +192,6 @@ void dtiTractographyImageFilter::ComputeAdditionalScalarMaps()
             tmpPoint[j] = myPoints->GetPoint(i)[j];
 
         this->GetInputImage()->TransformPhysicalPointToContinuousIndex(tmpPoint,tmpIndex);
-        tensorValue.Fill(0.0);
         if (m_DTIInterpolator->IsInsideBuffer(tmpIndex))
             this->GetModelValue(tmpIndex,tensorValue);
 

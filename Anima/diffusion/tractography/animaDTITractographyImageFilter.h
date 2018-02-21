@@ -55,6 +55,7 @@ protected:
 
 private:
     ITK_DISALLOW_COPY_AND_ASSIGN(dtiTractographyImageFilter);
+    void GetScalarValues(const VectorType &modelValue, double &mdValue, double &faValue);
 
     double m_StopFAThreshold;
     double m_StopADCThreshold;
