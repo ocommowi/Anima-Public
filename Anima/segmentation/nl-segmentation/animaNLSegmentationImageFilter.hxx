@@ -120,7 +120,7 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 
     labelFilter->Update();
 
-    MaskImageType *maskImg = labelFilter->GetOutput();
+    typename MaskImageType::Pointer maskImg = labelFilter->GetOutput();
     maskImg->DisconnectPipeline();
 
     typedef itk::BinaryBallStructuringElement <unsigned short, 3> BallElementType;
