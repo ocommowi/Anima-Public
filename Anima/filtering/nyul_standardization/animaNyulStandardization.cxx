@@ -9,6 +9,7 @@ struct arguments
 {
     std::string reference, moving, output;
     unsigned int nlevels, npoints, nthreads;
+    bool thrMean;
 };
 
 template <class ComponentType, unsigned int InputDim>
@@ -24,6 +25,7 @@ standardize(itk::ImageIOBase::Pointer imageIO, const arguments &args)
     mainFilter->SetInput(anima::readImage<ImageType>(args.moving));
     mainFilter->SetNumberOfHistogramLevels(args.nlevels);
     mainFilter->SetNumberOfMatchPoints(args.npoints);
+    mainFilter->SetThresholdAtMeanIntensity(args.thrMean);
     mainFilter->SetNumberOfThreads(args.nthreads);
     mainFilter->Update();
     
@@ -45,6 +47,7 @@ int main(int argc, char **argv)
     TCLAP::ValueArg<std::string> movArg("m","movingfile","Moving image",true,"","moving image",cmd);
     TCLAP::ValueArg<std::string> outArg("o","outputfile","output image",true,"","output image",cmd);
     
+    TCLAP::SwitchArg thrMeanArg("T","no-thr-mean","Do not threshold at mean intensity (effectively remove background voxels)",cmd);
     TCLAP::ValueArg<unsigned int> nlvlArg("","nhl","Number of histogram levels (default: 100)",false,100,"number of histogram levels",cmd);
     TCLAP::ValueArg<unsigned int> nptsArg("","nmp","Number of match points (default: 15)",false,15,"number of match points",cmd);
 
@@ -81,6 +84,7 @@ int main(int argc, char **argv)
     args.nlevels = nlvlArg.getValue();
     args.npoints = nptsArg.getValue();
     args.nthreads = nbpArg.getValue();
+    args.thrMean = !thrMeanArg.isSet();
     
     try
     {
