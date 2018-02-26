@@ -10,12 +10,12 @@ namespace anima
 {
 
 template <class PixelScalarType, class PixelOutputScalarType>
-class NLMeansSegmentationImageFilter :
+class NLSegmentationImageFilter :
         public anima::MaskedImageToImageFilter< itk::Image <PixelScalarType, 3> , itk::Image <PixelOutputScalarType, 3> >
 {
 public:
     /** Standard class typedefs. */
-    typedef NLMeansSegmentationImageFilter <PixelScalarType, PixelOutputScalarType> Self;
+    typedef NLSegmentationImageFilter <PixelScalarType, PixelOutputScalarType> Self;
     typedef itk::SmartPointer <Self> Pointer;
     typedef itk::SmartPointer <const Self> ConstPointer;
 
@@ -23,7 +23,7 @@ public:
     itkNewMacro(Self)
 
     /** Run-time type information (and related methods) */
-    itkTypeMacro(NLMeansSegmentationImageFilter, MaskedImageToImageFilter)
+    itkTypeMacro(NLSegmentationImageFilter, MaskedImageToImageFilter)
 
     /** Image typedef support */
     typedef itk::Image <PixelScalarType, 3> InputImageType;
@@ -68,7 +68,7 @@ public:
     itkSetMacro(Threshold, double)
 
 protected:
-    NLMeansSegmentationImageFilter()
+    NLSegmentationImageFilter()
         : Superclass()
     {
         m_DatabaseImages.clear();
@@ -81,13 +81,15 @@ protected:
         m_SearchNeighborhood = 4;
     }
 
-    virtual ~NLMeansSegmentationImageFilter() {}
+    virtual ~NLSegmentationImageFilter() {}
 
     void BeforeThreadedGenerateData() ITK_OVERRIDE;
     void ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, itk::ThreadIdType threadId) ITK_OVERRIDE;
 
+    void CheckComputationMask() ITK_OVERRIDE;
+
 private:
-    ITK_DISALLOW_COPY_AND_ASSIGN(NLMeansSegmentationImageFilter);
+    ITK_DISALLOW_COPY_AND_ASSIGN(NLSegmentationImageFilter);
 
     std::vector <InputImagePointer> m_DatabaseImages;
     std::vector <OutputImagePointer> m_DatabaseSegmentationImages;
@@ -107,4 +109,4 @@ private:
 
 } // end namespace anima
 
-#include "animaNLMeansSegmentationImageFilter.hxx"
+#include "animaNLSegmentationImageFilter.hxx"

@@ -1,13 +1,17 @@
 #pragma once
-#include "animaNLMeansSegmentationImageFilter.h"
+#include "animaNLSegmentationImageFilter.h"
 
 #include <itkImageRegionIterator.h>
 #include <itkImageRegionIteratorWithIndex.h>
 #include <itkImageRegionConstIterator.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
-#include <itkTimeProbe.h>
+#include <itkAddImageFilter.h>
+#include <itkThresholdImageFilter.h>
+#include <itkThresholdLabelerImageFilter.h>
+#include <itkBinaryBallStructuringElement.h>
+#include <itkGrayscaleDilateImageFilter.h>
 
-#include <animaNLMeansSegmentationPatchSearcher.h>
+#include <animaNLSegmentationPatchSearcher.h>
 #include <animaMeanAndVarianceImagesFilter.h>
 
 namespace anima
@@ -15,7 +19,7 @@ namespace anima
 
 template <class PixelScalarType, class PixelOutputScalarType>
 void
-NLMeansSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
+NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 ::BeforeThreadedGenerateData()
 {
     Superclass::BeforeThreadedGenerateData();
@@ -66,7 +70,87 @@ NLMeansSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 
 template <class PixelScalarType, class PixelOutputScalarType>
 void
-NLMeansSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
+NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
+::CheckComputationMask()
+{
+    if (this->GetComputationMask())
+        return;
+
+    typedef itk::AddImageFilter <OutputImageType, OutputImageType, OutputImageType> AddFilterType;
+
+    OutputImagePointer outImg = OutputImageType::New();
+    outImg->Initialize();
+    outImg->SetRegions(this->GetInput()->GetLargestPossibleRegion());
+    outImg->SetSpacing (this->GetInput()->GetSpacing());
+    outImg->SetOrigin (this->GetInput()->GetOrigin());
+    outImg->SetDirection (this->GetInput()->GetDirection());
+    outImg->Allocate();
+
+    outImg->FillBuffer(0);
+
+    for (unsigned int i = 0;i < m_DatabaseSegmentationImages.size();++i)
+    {
+        typename AddFilterType::Pointer addFilter = AddFilterType::New();
+        addFilter->SetInput1(outImg);
+        addFilter->SetInput2(m_DatabaseSegmentationImages[i]);
+        addFilter->SetNumberOfThreads(this->GetNumberOfThreads());
+
+        addFilter->Update();
+        outImg = addFilter->GetOutput();
+        outImg->DisconnectPipeline();
+    }
+
+    typedef itk::ThresholdImageFilter <OutputImageType> ThresholdFilterType;
+    typename ThresholdFilterType::Pointer thrFilter = ThresholdFilterType::New();
+    thrFilter->SetInput(outImg);
+    thrFilter->SetOutsideValue(0);
+    thrFilter->SetNumberOfThreads(this->GetNumberOfThreads());
+
+    thrFilter->Update();
+
+    typedef itk::ThresholdLabelerImageFilter <OutputImageType,MaskImageType> LabelerFilterType;
+    typename LabelerFilterType::Pointer labelFilter = LabelerFilterType::New();
+    labelFilter->SetInput(thrFilter->GetOutput());
+
+    typename LabelerFilterType::RealThresholdVector thrVals;
+    thrVals.push_back(0);
+
+    labelFilter->SetRealThresholds(thrVals);
+    labelFilter->SetNumberOfThreads(this->GetNumberOfThreads());
+
+    labelFilter->Update();
+
+    MaskImageType *maskImg = labelFilter->GetOutput();
+    maskImg->DisconnectPipeline();
+
+    typedef itk::BinaryBallStructuringElement <unsigned short, 3> BallElementType;
+    typedef itk::GrayscaleDilateImageFilter <MaskImageType,MaskImageType,BallElementType> DilateFilterType;
+
+    typename DilateFilterType::Pointer dilateFilter = DilateFilterType::New();
+    dilateFilter->SetInput(maskImg);
+    dilateFilter->SetNumberOfThreads(this->GetNumberOfThreads());
+
+    BallElementType tmpBall;
+    BallElementType::SizeType ballSize;
+
+    for (unsigned int i = 0;i < InputImageType::ImageDimension;++i)
+        ballSize[i] = m_SearchNeighborhood + 1;
+
+    tmpBall.SetRadius(ballSize);
+    tmpBall.CreateStructuringElement();
+
+    dilateFilter->SetKernel(tmpBall);
+    dilateFilter->Update();
+
+    maskImg = dilateFilter->GetOutput();
+    maskImg->DisconnectPipeline();
+
+    this->SetComputationMask(maskImg);
+}
+
+template <class PixelScalarType, class PixelOutputScalarType>
+void
+NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 ::ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, itk::ThreadIdType threadId)
 {
     typedef itk::ImageRegionConstIterator <OutputImageType> SegmentationIteratorType;
@@ -86,7 +170,7 @@ NLMeansSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 
     int maxAbsDisp = (int)std::floor((double)(m_SearchNeighborhood / m_SearchStepSize)) * m_SearchStepSize;
 
-    typedef anima::NLMeansSegmentationPatchSearcher <InputImageType, DataImageType, OutputImageType> PatchSearcherType;
+    typedef anima::NLSegmentationPatchSearcher <InputImageType, DataImageType, OutputImageType> PatchSearcherType;
 
     InputImageType *input = const_cast <InputImageType *> (this->GetInput());
 

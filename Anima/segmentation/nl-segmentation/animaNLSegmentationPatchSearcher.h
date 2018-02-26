@@ -10,7 +10,7 @@ namespace anima
  * Supports only one comparison image that is the same as the input
  */
 template <class ImageType, class DataImageType, class SegmentationImageType>
-class NLMeansSegmentationPatchSearcher : public anima::NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
+class NLSegmentationPatchSearcher : public anima::NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
 {
 public:
     typedef typename DataImageType::Pointer DataImagePointer;
@@ -18,8 +18,8 @@ public:
     typedef typename Superclass::ImageRegionType ImageRegionType;
     typedef typename Superclass::IndexType IndexType;
 
-    NLMeansSegmentationPatchSearcher();
-    virtual ~NLMeansSegmentationPatchSearcher() {}
+    NLSegmentationPatchSearcher();
+    virtual ~NLSegmentationPatchSearcher() {}
 
     void SetThreshold(double arg) {m_Threshold = arg;}
 
@@ -45,4 +45,4 @@ private:
 
 } // end namespace anima
 
-#include "animaNLMeansSegmentationPatchSearcher.hxx"
+#include "animaNLSegmentationPatchSearcher.hxx"

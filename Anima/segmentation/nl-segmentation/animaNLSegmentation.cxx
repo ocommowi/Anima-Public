@@ -2,7 +2,7 @@
 #include <tclap/CmdLine.h>
 
 #include <animaReadWriteFunctions.h>
-#include <animaNLMeansSegmentationImageFilter.h>
+#include <animaNLSegmentationImageFilter.h>
 #include <itkTimeProbe.h>
 
 //Update progression of the process
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     
-    typedef anima::NLMeansSegmentationImageFilter <double, unsigned short> NLSegmentationImageFilterType;
+    typedef anima::NLSegmentationImageFilter <double, unsigned short> NLSegmentationImageFilterType;
     typedef NLSegmentationImageFilterType::InputImageType ImageType;
     typedef NLSegmentationImageFilterType::OutputImageType SegmentationImageType;
 

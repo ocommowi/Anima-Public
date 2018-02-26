@@ -1,19 +1,19 @@
 #pragma once
-#include "animaNLMeansSegmentationPatchSearcher.h"
+#include "animaNLSegmentationPatchSearcher.h"
 
 namespace anima
 {
 
 template <class ImageType, class DataImageType, class SegmentationImageType>
-NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
-::NLMeansSegmentationPatchSearcher()
+NLSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
+::NLSegmentationPatchSearcher()
 {
     m_Threshold = 0.95;
 }
 
 template <class ImageType, class DataImageType, class SegmentationImageType>
 void
-NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
+NLSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
 ::AddComparisonMeanImage(DataImageType *arg)
 {
     m_ComparisonMeanImages.push_back(arg);
@@ -21,7 +21,7 @@ NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageTyp
 
 template <class ImageType, class DataImageType, class SegmentationImageType>
 void
-NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
+NLSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
 ::AddComparisonVarImage(DataImageType *arg)
 {
     m_ComparisonVarImages.push_back(arg);
@@ -29,7 +29,7 @@ NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageTyp
 
 template <class ImageType, class DataImageType, class SegmentationImageType>
 bool
-NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
+NLSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
 ::TestPatchConformity(unsigned int index, const IndexType &refIndex, const IndexType &movingIndex)
 {
     double refMeanValue = m_MeanImage->GetPixel(refIndex);
@@ -54,7 +54,7 @@ NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageTyp
 
 template <class ImageType, class DataImageType, class SegmentationImageType>
 double
-NLMeansSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
+NLSegmentationPatchSearcher <ImageType, DataImageType, SegmentationImageType>
 ::ComputeWeightValue(unsigned int index, ImageRegionType &refPatch, ImageRegionType &movingPatch)
 {
     typedef itk::ImageRegionConstIteratorWithIndex< ImageType > InIteratorType;
