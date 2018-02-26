@@ -7,8 +7,8 @@
 namespace anima
 {
 
-template <class ImageType>
-NonLocalPatchBaseSearcher <ImageType>
+template <class ImageType, class SegmentationImageType>
+NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
 ::NonLocalPatchBaseSearcher()
 {
     m_PatchHalfSize = 1;
@@ -19,17 +19,17 @@ NonLocalPatchBaseSearcher <ImageType>
     m_InputImage = 0;
 }
 
-template <class ImageType>
+template <class ImageType, class SegmentationImageType>
 void
-NonLocalPatchBaseSearcher <ImageType>
+NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
 ::AddComparisonImage(ImageType *arg)
 {
     m_ComparisonImages.push_back(arg);
 }
 
-template <class ImageType>
+template <class ImageType, class SegmentationImageType>
 ImageType *
-NonLocalPatchBaseSearcher <ImageType>
+NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
 ::GetComparisonImage(unsigned int index)
 {
     if (index >= m_ComparisonImages.size())
@@ -38,9 +38,17 @@ NonLocalPatchBaseSearcher <ImageType>
     return m_ComparisonImages[index];
 }
 
-template <class ImageType>
+template <class ImageType, class SegmentationImageType>
 void
-NonLocalPatchBaseSearcher <ImageType>
+NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
+::AddSegmentationImage(SegmentationImageType *arg)
+{
+    m_SegmentationImages.push_back(arg);
+}
+
+template <class ImageType, class SegmentationImageType>
+void
+NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
 ::UpdateAtPosition(const IndexType &dataIndex)
 {
     if (m_ComparisonImages.size() == 0)
@@ -49,6 +57,7 @@ NonLocalPatchBaseSearcher <ImageType>
 
     m_DatabaseWeights.clear();
     m_DatabaseSamples.clear();
+    m_DatabaseSegmentationSamples.clear();
 
     IndexType blockIndex, dispIndex, movingIndex;
     SizeType blockSize, dispSize;
@@ -89,8 +98,18 @@ NonLocalPatchBaseSearcher <ImageType>
     for (unsigned int k = 0;k < numComparisonImages;++k)
         comparisonIt[k] = ComparisonIteratorType(m_ComparisonImages[k],dispRegion);
 
+    typedef itk::ImageRegionConstIterator <SegmentationImageType> SegmentationIteratorType;
+    std::vector <SegmentationIteratorType> segmentationIt;
+
+    if (m_SegmentationImages.size() != 0)
+    {
+        for (unsigned int k = 0;k < numComparisonImages;++k)
+            segmentationIt.push_back(SegmentationIteratorType(m_SegmentationImages[k],dispRegion));
+    }
+
     IndexType dispBaseIndex = dispIt.GetIndex();
     IndexType dispCurIndex;
+    bool segmentationImagesPresent = (m_SegmentationImages.size() != 0);
     while (!dispIt.IsAtEnd())
     {
         dispCurIndex = dispIt.GetIndex();
@@ -138,6 +157,9 @@ NonLocalPatchBaseSearcher <ImageType>
                         m_DatabaseWeights.push_back(weightValue);
                         // Getting center index value
                         m_DatabaseSamples.push_back(comparisonIt[k].Get());
+
+                        if (segmentationImagesPresent)
+                            m_DatabaseSegmentationSamples.push_back(segmentationIt[k].Get());
                     }
                 }
             }
@@ -146,6 +168,12 @@ NonLocalPatchBaseSearcher <ImageType>
         ++dispIt;
         for (unsigned int k = 0;k < numComparisonImages;++k)
             ++comparisonIt[k];
+
+        if (segmentationImagesPresent)
+        {
+            for (unsigned int k = 0;k < numComparisonImages;++k)
+                ++segmentationIt[k];
+        }
     }
 }
 

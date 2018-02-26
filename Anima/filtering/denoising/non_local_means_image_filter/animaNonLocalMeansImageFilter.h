@@ -78,7 +78,6 @@ protected:
         m_SearchNeighborhood(6),
         m_WeightMethod(EXP),
         m_localNeighborhood(1)
-
     {}
 
     virtual ~NonLocalMeansImageFilter() {}

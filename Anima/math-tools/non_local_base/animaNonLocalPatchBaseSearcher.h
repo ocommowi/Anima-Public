@@ -11,7 +11,7 @@ namespace anima
  * if the concrete class does support it. Does not compute weights and samples for central voxels
  * as these would always get a weight of 1. Instead, it is the developer task to implement it in his filter
  */
-template <class ImageType>
+template <class ImageType, class SegmentationImageType = ImageType>
 class NonLocalPatchBaseSearcher
 {
 public:
@@ -20,6 +20,8 @@ public:
     typedef typename ImageType::RegionType ImageRegionType;
     typedef typename ImageType::Pointer ImagePointer;
     typedef typename ImageType::PixelType PixelType;
+    typedef typename SegmentationImageType::Pointer SegmentationImagePointer;
+    typedef typename SegmentationImageType::PixelType SegmentationPixelType;
 
     NonLocalPatchBaseSearcher();
     virtual ~NonLocalPatchBaseSearcher() {}
@@ -35,8 +37,11 @@ public:
     void AddComparisonImage(ImageType *arg);
     ImageType *GetComparisonImage(unsigned int index);
 
+    void AddSegmentationImage(SegmentationImageType *arg);
+
     itkGetConstReferenceMacro(DatabaseWeights, std::vector <double>)
     itkGetConstReferenceMacro(DatabaseSamples, std::vector <PixelType>)
+    itkGetConstReferenceMacro(DatabaseSegmentationSamples, std::vector <SegmentationPixelType>)
 
     void UpdateAtPosition(const IndexType &dataIndex);
 
@@ -54,9 +59,11 @@ private:
 
     ImagePointer m_InputImage;
     std::vector <ImagePointer> m_ComparisonImages;
+    std::vector <SegmentationImagePointer> m_SegmentationImages;
 
     std::vector <double> m_DatabaseWeights;
     std::vector <PixelType> m_DatabaseSamples;
+    std::vector <SegmentationPixelType> m_DatabaseSegmentationSamples;
 };
 
 } // end namespace anima
