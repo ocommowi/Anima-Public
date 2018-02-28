@@ -78,9 +78,9 @@ bool dtiTractographyImageFilter::CheckIndexInImageBounds(ContinuousIndexType &in
     return m_DTIInterpolator->IsInsideBuffer(index);
 }
 
-void dtiTractographyImageFilter::GetModelValue(ContinuousIndexType &index, VectorType &modelValue)
+dtiTractographyImageFilter::VectorType dtiTractographyImageFilter::GetModelValue(ContinuousIndexType &index, PointType &currentDirection, itk::ThreadIdType threadId)
 {
-    modelValue = m_DTIInterpolator->EvaluateAtContinuousIndex(index);
+    return m_DTIInterpolator->EvaluateAtContinuousIndex(index);
 }
 
 std::vector <dtiTractographyImageFilter::PointType>
@@ -183,6 +183,8 @@ void dtiTractographyImageFilter::ComputeAdditionalScalarMaps()
 
     VectorType tensorValue(6);
     tensorValue.Fill(0.0);
+    PointType currentDir;
+    currentDir.Fill(0.0);
 
     anima::LogEuclideanTensorCalculator <double>::Pointer leCalculator = anima::LogEuclideanTensorCalculator <double>::New();
 
@@ -193,7 +195,7 @@ void dtiTractographyImageFilter::ComputeAdditionalScalarMaps()
 
         this->GetInputImage()->TransformPhysicalPointToContinuousIndex(tmpPoint,tmpIndex);
         if (m_DTIInterpolator->IsInsideBuffer(tmpIndex))
-            this->GetModelValue(tmpIndex,tensorValue);
+            tensorValue = this->GetModelValue(tmpIndex,currentDir,0);
 
         anima::GetTensorFromVectorRepresentation(tensorValue,tmpMat,3,false);
         leCalculator->GetTensorExponential(tmpMat,tmpMat);
