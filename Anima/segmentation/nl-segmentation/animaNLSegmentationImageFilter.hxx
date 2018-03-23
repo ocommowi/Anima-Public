@@ -33,6 +33,9 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
     if (m_DatabaseImages.size() != m_DatabaseSegmentationImages.size())
         itkExceptionMacro("There should be the same number of input segmentations and database images...")
 
+    if (m_NumberOfSelectedAtlases > 0)
+        this->SelectClosestAtlases();
+
     typedef anima::MeanAndVarianceImagesFilter<InputImageType, DataImageType> MeanVarianceFilterType;
     typename InputImageType::SizeType radius;
     for (unsigned int j = 0;j < InputImageType::ImageDimension;++j)
@@ -66,6 +69,55 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 
     m_ReferenceVarImage = filter->GetVarImage();
     m_ReferenceVarImage->DisconnectPipeline();
+}
+
+template <class PixelScalarType, class PixelOutputScalarType>
+void
+NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
+::SelectClosestAtlases()
+{
+    if (m_NumberOfSelectedAtlases > m_DatabaseImages.size())
+    {
+        m_NumberOfSelectedAtlases = m_DatabaseImages.size();
+        return;
+    }
+
+    std::vector < std::pair <unsigned int, double> > ssdAtlases(m_DatabaseImages.size());
+    typedef itk::ImageRegionConstIterator <InputImageType> InputIteratorType;
+    typedef itk::ImageRegionConstIterator <DataImageType> DataIteratorType;
+
+    InputIteratorType inItr(this->GetInput(), this->GetComputationRegion());
+    for (unsigned int i = 0;i < m_DatabaseImages.size();++i)
+    {
+        inItr.GoToBegin();
+        DataIteratorType dataItr(m_DatabaseImages[i],this->GetComputationRegion());
+
+        double ssdValue = 0;
+        while (!dataItr.IsAtEnd())
+        {
+            double inValue = inItr.Get();
+            double dataValue = dataItr.Get();
+            ssdValue += (inValue - dataValue) * (inValue - dataValue);
+
+            ++dataItr;
+            ++inItr;
+        }
+
+        ssdAtlases[i] = std::make_pair(i,ssdValue);
+    }
+
+    std::partial_sort(ssdAtlases.begin(),ssdAtlases.begin() + m_NumberOfSelectedAtlases, ssdAtlases.end(),pair_comparator());
+
+    std::vector <DataImagePointer> selectedDataImages(m_NumberOfSelectedAtlases);
+    std::vector <OutputImagePointer> selectedSegmentationImages(m_NumberOfSelectedAtlases);
+    for (unsigned int i = 0;i < m_NumberOfSelectedAtlases;++i)
+    {
+        selectedDataImages[i] = m_DatabaseImages[ssdAtlases[i].first];
+        selectedSegmentationImages[i] = m_DatabaseSegmentationImages[ssdAtlases[i].first];
+    }
+
+    m_DatabaseImages = selectedDataImages;
+    m_DatabaseSegmentationImages = selectedSegmentationImages;
 }
 
 template <class PixelScalarType, class PixelOutputScalarType>
@@ -183,6 +235,7 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
     patchSearcher.SetThreshold(m_Threshold);
     patchSearcher.SetMeanImage(m_ReferenceMeanImage);
     patchSearcher.SetVarImage(m_ReferenceVarImage);
+    patchSearcher.SetIgnoreCenterPatches(false);
 
     for (unsigned int k = 0;k < numSamplesDatabase;++k)
     {
@@ -212,21 +265,14 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
         databaseSegSamples = patchSearcher.GetDatabaseSegmentationSamples();
         databaseWeights = patchSearcher.GetDatabaseWeights();
 
-        double maxSamplesWeight = 0;
-        for (unsigned int k = 0;k < databaseWeights.size();++k)
+        // Add center pixels if no data selected
+        if (databaseSegSamples.size() == 0)
         {
-            if (maxSamplesWeight < databaseWeights[k])
-                maxSamplesWeight = databaseWeights[k];
-        }
-
-        // Add center pixels
-        if (maxSamplesWeight == 0)
-            maxSamplesWeight = 1.0;
-
-        for (unsigned int k = 0;k < numSamplesDatabase;++k)
-        {
-            databaseSegSamples.push_back(databaseSegIterators[k].Get());
-            databaseWeights.push_back(maxSamplesWeight);
+            for (unsigned int k = 0;k < numSamplesDatabase;++k)
+            {
+                databaseSegSamples.push_back(databaseSegIterators[k].Get());
+                databaseWeights.push_back(1.0);
+            }
         }
 
         PixelOutputScalarType outSegValue = 0;

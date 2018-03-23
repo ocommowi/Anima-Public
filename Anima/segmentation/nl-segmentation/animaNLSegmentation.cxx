@@ -19,6 +19,7 @@ int main(int argc, char **argv)
     TCLAP::ValueArg<std::string> refArg("i","input","Image to delineate",true,"","image to delineate",cmd);
     TCLAP::ValueArg<std::string> dataArg("I","database","Database image list",true,"","database image list",cmd);
     TCLAP::ValueArg<std::string> dataSegArg("S","database-seg","Segmentations database image list",true,"","segmentation database image list",cmd);
+    TCLAP::ValueArg<unsigned int> numAtlasesArg("N","n-atlases","Number of closest atlases selected (default: all)",false,0,"number of closest atlases selected",cmd);
 
     TCLAP::ValueArg<std::string> maskArg("m","maskname","Computation mask",false,"","computation mask",cmd);
     TCLAP::ValueArg<std::string> resArg("o","output","Labeled image",true,"","labeled image",cmd);
@@ -31,7 +32,7 @@ int main(int argc, char **argv)
     TCLAP::ValueArg<unsigned int> patchHSArg("","patchhalfsize","Patch half size in each direction (default: 1)",false,1,"patch half size",cmd);
     TCLAP::ValueArg<unsigned int> patchSSArg("","patchstepsize","Patch step size for searching (default: 1)",false,1,"patch search step size",cmd);
     TCLAP::ValueArg<unsigned int> patchNeighArg("n","patchneighborhood","Patch half neighborhood size (default: 3)",false,3,"patch search neighborhood size",cmd);
-    
+
     try
     {
         cmd.parse(argc,argv);
@@ -55,6 +56,7 @@ int main(int argc, char **argv)
         mainFilter->SetComputationMask(anima::readImage < itk::Image <unsigned char, 3> > (maskArg.getValue()));
 
     mainFilter->SetNumberOfThreads(nbpArg.getValue());
+    mainFilter->SetNumberOfSelectedAtlases(numAtlasesArg.getValue());
 
     mainFilter->SetWeightThreshold(weightThrArg.getValue());
     mainFilter->SetThreshold(thrArg.getValue());

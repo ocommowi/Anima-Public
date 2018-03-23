@@ -17,6 +17,7 @@ NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
     m_WeightThreshold = 0.0;
 
     m_InputImage = 0;
+    m_IgnoreCenterPatches = true;
 }
 
 template <class ImageType, class SegmentationImageType>
@@ -139,7 +140,7 @@ NonLocalPatchBaseSearcher <ImageType, SegmentationImageType>
                 isCentralIndex = false;
         }
 
-        if (movingRegionIsValid && onSearchStepSize && (!isCentralIndex))
+        if (movingRegionIsValid && onSearchStepSize && ((!isCentralIndex)||(!m_IgnoreCenterPatches)))
         {
             blockRegionMoving.SetIndex(movingIndex);
             blockRegionMoving.SetSize(blockRegion.GetSize());

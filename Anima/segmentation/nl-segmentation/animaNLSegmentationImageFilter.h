@@ -66,6 +66,7 @@ public:
     itkSetMacro(SearchStepSize, unsigned int)
     itkSetMacro(WeightThreshold, double)
     itkSetMacro(Threshold, double)
+    itkSetMacro(NumberOfSelectedAtlases, unsigned int)
 
 protected:
     NLSegmentationImageFilter()
@@ -79,6 +80,8 @@ protected:
         m_PatchHalfSize = 1;
         m_SearchStepSize = 2;
         m_SearchNeighborhood = 4;
+
+        m_NumberOfSelectedAtlases = 0;
     }
 
     virtual ~NLSegmentationImageFilter() {}
@@ -87,6 +90,14 @@ protected:
     void ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, itk::ThreadIdType threadId) ITK_OVERRIDE;
 
     void CheckComputationMask() ITK_OVERRIDE;
+
+    void SelectClosestAtlases();
+
+    struct pair_comparator
+    {
+        bool operator() (const std::pair<unsigned int, double> & f, const std::pair<unsigned int, double> & s)
+        { return (f.second < s.second); }
+    };
 
 private:
     ITK_DISALLOW_COPY_AND_ASSIGN(NLSegmentationImageFilter);
@@ -105,6 +116,7 @@ private:
     unsigned int m_PatchHalfSize;
     unsigned int m_SearchStepSize;
     unsigned int m_SearchNeighborhood;
+    unsigned int m_NumberOfSelectedAtlases;
 };
 
 } // end namespace anima

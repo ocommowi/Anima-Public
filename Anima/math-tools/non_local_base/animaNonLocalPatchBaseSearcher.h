@@ -30,6 +30,7 @@ public:
     void SetSearchStepSize(unsigned int arg) {m_SearchStepSize = arg;}
     void SetMaxAbsDisp(unsigned int arg) {m_MaxAbsDisp = arg;}
     void SetWeightThreshold(double arg) {m_WeightThreshold = arg;}
+    void SetIgnoreCenterPatches(bool arg) {m_IgnoreCenterPatches = arg;}
 
     void SetInputImage(ImageType *arg) {m_InputImage = arg;}
     itkGetObjectMacro(InputImage, ImageType)
@@ -56,6 +57,7 @@ private:
     unsigned int m_SearchStepSize;
     unsigned int m_MaxAbsDisp;
     double m_WeightThreshold;
+    bool m_IgnoreCenterPatches;
 
     ImagePointer m_InputImage;
     std::vector <ImagePointer> m_ComparisonImages;
