@@ -3,6 +3,8 @@
 #include <iostream>
 #include <animaMaskedImageToImageFilter.h>
 #include <itkImage.h>
+#include <itkVectorImage.h>
+#include <itkFastMutexLock.h>
 
 #include <vector>
 
@@ -29,10 +31,13 @@ public:
     typedef itk::Image <PixelScalarType, 3> InputImageType;
     typedef itk::Image <PixelOutputScalarType, 3> OutputImageType;
     typedef itk::Image <double, 3> DataImageType;
+    typedef itk::VectorImage <float, 3> VectorImageType;
 
-    typedef typename InputImageType::PixelType VectorType;
+    typedef typename VectorImageType::Pointer VectorImagePointer;
+    typedef typename VectorImageType::PixelType VectorType;
 
-    typedef vnl_matrix <double> CovarianceType;
+    typedef typename InputImageType::RegionType RegionType;
+    typedef typename InputImageType::IndexType IndexType;
 
     typedef typename InputImageType::Pointer InputImagePointer;
     typedef typename InputImageType::IndexType InputImageIndexType;
@@ -43,13 +48,6 @@ public:
     typedef anima::MaskedImageToImageFilter< InputImageType, OutputImageType > Superclass;
     typedef typename Superclass::OutputImageRegionType OutputImageRegionType;
     typedef typename Superclass::MaskImageType MaskImageType;
-
-    typedef struct
-    {
-        OutputImageRegionType movingRegion;
-        unsigned int numDatabaseImage;
-        InputImageIndexType centerIndex;
-    } SampleIdentifier;
 
     void AddDatabaseInput(InputImageType *tmpIm)
     {
@@ -88,10 +86,11 @@ protected:
 
     void BeforeThreadedGenerateData() ITK_OVERRIDE;
     void ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, itk::ThreadIdType threadId) ITK_OVERRIDE;
+    void AfterThreadedGenerateData() ITK_OVERRIDE;
 
     void CheckComputationMask() ITK_OVERRIDE;
 
-    void SelectClosestAtlases();
+    void SelectClosestAtlases(RegionType &patchNeighborhood, std::vector <unsigned int> &selectedAtlases);
 
     struct pair_comparator
     {
@@ -109,6 +108,10 @@ private:
     std::vector <DataImagePointer> m_DatabaseVarImages;
     DataImagePointer m_ReferenceMeanImage;
     DataImagePointer m_ReferenceVarImage;
+
+    VectorImagePointer m_TemporaryOutputImage;
+    //! Lock to ensure no overwriting of output data
+    itk::SimpleFastMutexLock m_LockTemporaryOutputImage;
 
     double m_WeightThreshold;
     double m_Threshold;

@@ -27,7 +27,10 @@ public:
     void SetVarImage(DataImageType *arg) {m_VarImage = arg;}
 
     void AddComparisonMeanImage(DataImageType *arg);
+    void ClearComparisonMeanImages() {m_ComparisonMeanImages.clear();}
+
     void AddComparisonVarImage(DataImageType *arg);
+    void ClearComparisonVarImages() {m_ComparisonVarImages.clear();}
 
 protected:
     virtual double ComputeWeightValue(unsigned int index, ImageRegionType &refPatch, ImageRegionType &movingPatch);

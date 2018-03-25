@@ -37,8 +37,10 @@ public:
 
     void AddComparisonImage(ImageType *arg);
     ImageType *GetComparisonImage(unsigned int index);
+    void ClearComparisonImages() {m_ComparisonImages.clear();}
 
     void AddSegmentationImage(SegmentationImageType *arg);
+    void ClearSegmentationImages() {m_SegmentationImages.clear();}
 
     itkGetConstReferenceMacro(DatabaseWeights, std::vector <double>)
     itkGetConstReferenceMacro(DatabaseSamples, std::vector <PixelType>)

@@ -33,14 +33,14 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
     if (m_DatabaseImages.size() != m_DatabaseSegmentationImages.size())
         itkExceptionMacro("There should be the same number of input segmentations and database images...")
 
-    if (m_NumberOfSelectedAtlases > 0)
-        this->SelectClosestAtlases();
-
     typedef anima::MeanAndVarianceImagesFilter<InputImageType, DataImageType> MeanVarianceFilterType;
     typename InputImageType::SizeType radius;
     for (unsigned int j = 0;j < InputImageType::ImageDimension;++j)
         radius[j] = m_PatchHalfSize;
 
+    typedef itk::ImageRegionConstIterator <OutputImageType> SegmentationIteratorType;
+
+    unsigned int maxSegmentationIndex = 0;
     for (unsigned int i = 0;i < m_DatabaseImages.size();++i)
     {
         typename MeanVarianceFilterType::Pointer filter = MeanVarianceFilterType::New();
@@ -55,7 +55,29 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 
         m_DatabaseVarImages.push_back(filter->GetVarImage());
         m_DatabaseVarImages[i]->DisconnectPipeline();
+
+        SegmentationIteratorType segItr(m_DatabaseSegmentationImages[i],m_DatabaseSegmentationImages[i]->GetLargestPossibleRegion());
+        while (!segItr.IsAtEnd())
+        {
+            if (segItr.Get() > maxSegmentationIndex)
+                maxSegmentationIndex = segItr.Get();
+
+            ++segItr;
+        }
     }
+
+    m_TemporaryOutputImage = VectorImageType::New();
+    m_TemporaryOutputImage->Initialize();
+    m_TemporaryOutputImage->SetRegions(this->GetInput()->GetLargestPossibleRegion());
+    m_TemporaryOutputImage->SetSpacing (this->GetInput()->GetSpacing());
+    m_TemporaryOutputImage->SetOrigin (this->GetInput()->GetOrigin());
+    m_TemporaryOutputImage->SetDirection (this->GetInput()->GetDirection());
+    m_TemporaryOutputImage->SetNumberOfComponentsPerPixel(maxSegmentationIndex + 1);
+    m_TemporaryOutputImage->Allocate();
+
+    typename VectorImageType::PixelType zeroPixel(maxSegmentationIndex + 1);
+    zeroPixel.Fill(0);
+    m_TemporaryOutputImage->FillBuffer(zeroPixel);
 
     typename MeanVarianceFilterType::Pointer filter = MeanVarianceFilterType::New();
     filter->SetInput(this->GetInput());
@@ -74,11 +96,14 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 template <class PixelScalarType, class PixelOutputScalarType>
 void
 NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
-::SelectClosestAtlases()
+::SelectClosestAtlases(RegionType &patchNeighborhood, std::vector <unsigned int> &selectedAtlases)
 {
-    if (m_NumberOfSelectedAtlases > m_DatabaseImages.size())
+    if ((m_NumberOfSelectedAtlases > m_DatabaseImages.size())||(m_NumberOfSelectedAtlases <= 0))
     {
-        m_NumberOfSelectedAtlases = m_DatabaseImages.size();
+        selectedAtlases.resize(m_DatabaseImages.size());
+        for (unsigned int i = 0;i < m_DatabaseImages.size();++i)
+            selectedAtlases[i] = i;
+
         return;
     }
 
@@ -86,11 +111,11 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
     typedef itk::ImageRegionConstIterator <InputImageType> InputIteratorType;
     typedef itk::ImageRegionConstIterator <DataImageType> DataIteratorType;
 
-    InputIteratorType inItr(this->GetInput(), this->GetComputationRegion());
+    InputIteratorType inItr(this->GetInput(), patchNeighborhood);
     for (unsigned int i = 0;i < m_DatabaseImages.size();++i)
     {
         inItr.GoToBegin();
-        DataIteratorType dataItr(m_DatabaseImages[i],this->GetComputationRegion());
+        DataIteratorType dataItr(m_DatabaseImages[i],patchNeighborhood);
 
         double ssdValue = 0;
         while (!dataItr.IsAtEnd())
@@ -108,16 +133,9 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 
     std::partial_sort(ssdAtlases.begin(),ssdAtlases.begin() + m_NumberOfSelectedAtlases, ssdAtlases.end(),pair_comparator());
 
-    std::vector <DataImagePointer> selectedDataImages(m_NumberOfSelectedAtlases);
-    std::vector <OutputImagePointer> selectedSegmentationImages(m_NumberOfSelectedAtlases);
+    selectedAtlases.resize(m_NumberOfSelectedAtlases);
     for (unsigned int i = 0;i < m_NumberOfSelectedAtlases;++i)
-    {
-        selectedDataImages[i] = m_DatabaseImages[ssdAtlases[i].first];
-        selectedSegmentationImages[i] = m_DatabaseSegmentationImages[ssdAtlases[i].first];
-    }
-
-    m_DatabaseImages = selectedDataImages;
-    m_DatabaseSegmentationImages = selectedSegmentationImages;
+        selectedAtlases[i] = ssdAtlases[i].first;
 }
 
 template <class PixelScalarType, class PixelOutputScalarType>
@@ -206,10 +224,9 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 ::ThreadedGenerateData(const OutputImageRegionType &outputRegionForThread, itk::ThreadIdType threadId)
 {
     typedef itk::ImageRegionConstIterator <OutputImageType> SegmentationIteratorType;
-    typedef itk::ImageRegionIterator <OutputImageType> OutRegionIteratorType;
+    typedef itk::ImageRegionIteratorWithIndex <VectorImageType> OutRegionIteratorType;
     typedef itk::ImageRegionConstIteratorWithIndex <MaskImageType> MaskRegionIteratorType;
 
-    OutRegionIteratorType outIterator(this->GetOutput(0), outputRegionForThread);
     MaskRegionIteratorType maskIterator (this->GetComputationMask(), outputRegionForThread);
 
     unsigned int numSamplesDatabase = m_DatabaseSegmentationImages.size();
@@ -237,27 +254,47 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
     patchSearcher.SetVarImage(m_ReferenceVarImage);
     patchSearcher.SetIgnoreCenterPatches(false);
 
-    for (unsigned int k = 0;k < numSamplesDatabase;++k)
-    {
-        patchSearcher.AddComparisonImage(m_DatabaseImages[k]);
-        patchSearcher.AddSegmentationImage(m_DatabaseSegmentationImages[k]);
-        patchSearcher.AddComparisonMeanImage(m_DatabaseMeanImages[k]);
-        patchSearcher.AddComparisonVarImage(m_DatabaseVarImages[k]);
-    }
-
     std::vector <double> labelWeights;
-    while (!outIterator.IsAtEnd())
+    RegionType patchRegion;
+    IndexType currentIndex;
+    RegionType largestRegion = this->GetInput()->GetLargestPossibleRegion();
+    std::vector <unsigned int> selectedAtlases;
+    while (!maskIterator.IsAtEnd())
     {
         if (maskIterator.Get() == 0)
         {
-            outIterator.Set(0);
-            ++outIterator;
             ++maskIterator;
 
             for (unsigned int k = 0;k < numSamplesDatabase;++k)
                 ++databaseSegIterators[k];
 
             continue;
+        }
+
+        currentIndex = maskIterator.GetIndex();
+
+        patchSearcher.ClearComparisonImages();
+        patchSearcher.ClearSegmentationImages();
+        patchSearcher.ClearComparisonMeanImages();
+        patchSearcher.ClearComparisonVarImages();
+
+        for (unsigned int i = 0;i < InputImageType::ImageDimension;++i)
+        {
+            int minIndex = std::max(largestRegion.GetIndex()[i],currentIndex[i] - m_PatchHalfSize - m_SearchNeighborhood);
+            int maxIndex = std::min((int)(largestRegion.GetIndex()[i] + largestRegion.GetSize()[i] - 1),
+                                    (int)(currentIndex[i] + m_PatchHalfSize + m_SearchNeighborhood));
+
+            patchRegion.SetIndex(i,minIndex);
+            patchRegion.SetSize(i,maxIndex - minIndex + 1);
+        }
+
+        this->SelectClosestAtlases(patchRegion, selectedAtlases);
+        for (unsigned int k = 0;k < selectedAtlases.size();++k)
+        {
+            patchSearcher.AddComparisonImage(m_DatabaseImages[selectedAtlases[k]]);
+            patchSearcher.AddSegmentationImage(m_DatabaseSegmentationImages[selectedAtlases[k]]);
+            patchSearcher.AddComparisonMeanImage(m_DatabaseMeanImages[selectedAtlases[k]]);
+            patchSearcher.AddComparisonVarImage(m_DatabaseVarImages[selectedAtlases[k]]);
         }
 
         patchSearcher.UpdateAtPosition(maskIterator.GetIndex());
@@ -300,13 +337,90 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
             }
         }
 
-        outIterator.Set(outSegValue);
+        RegionType outRegion;
+        RegionType computationRegion = this->GetComputationRegion();
+        for (unsigned int i = 0;i < InputImageType::ImageDimension;++i)
+        {
+            int minIndex = std::max(computationRegion.GetIndex()[i],currentIndex[i] - m_PatchHalfSize);
+            int maxIndex = std::min((int)(computationRegion.GetIndex()[i] + computationRegion.GetSize()[i] - 1), (int)(currentIndex[i] + m_PatchHalfSize));
+            outRegion.SetIndex(i,minIndex);
+            outRegion.SetSize(i,maxIndex - minIndex + 1);
+        }
 
-        ++outIterator;
+        m_LockTemporaryOutputImage.Lock();
+
+        OutRegionIteratorType outItr(m_TemporaryOutputImage, outRegion);
+        IndexType outIndex;
+        VectorType outVector;
+        while (!outItr.IsAtEnd())
+        {
+            double distCenter = 0;
+            outIndex = outItr.GetIndex();
+
+            for (unsigned int i = 0;i < InputImageType::ImageDimension;++i)
+                distCenter += (outIndex[i] - currentIndex[i]) * (outIndex[i] - currentIndex[i]);
+
+            outVector = outItr.Get();
+            outVector[outSegValue] += std::exp(- distCenter / (m_PatchHalfSize * m_PatchHalfSize));
+
+            outItr.Set(outVector);
+
+            ++outItr;
+        }
+
+        m_LockTemporaryOutputImage.Unlock();
+
         ++maskIterator;
 
         for (unsigned int k = 0;k < numSamplesDatabase;++k)
             ++databaseSegIterators[k];
+    }
+}
+
+template <class PixelScalarType, class PixelOutputScalarType>
+void
+NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
+::AfterThreadedGenerateData()
+{
+    // Processes temporary output to finally get the true regularized output values
+    VectorType outVector;
+    typedef itk::ImageRegionConstIterator <VectorImageType> VectorIteratorType;
+    typedef itk::ImageRegionIterator <OutputImageType> OutputIteratorType;
+    typedef itk::ImageRegionConstIterator <MaskImageType> MaskIteratorType;
+
+    OutputIteratorType outItr(this->GetOutput(),this->GetComputationRegion());
+    MaskIteratorType maskItr(this->GetComputationMask(),this->GetComputationRegion());
+    VectorIteratorType tempOutItr(m_TemporaryOutputImage,this->GetComputationRegion());
+
+    while (!maskItr.IsAtEnd())
+    {
+        if (maskItr.Get() == 0)
+        {
+            ++outItr;
+            ++maskItr;
+            ++tempOutItr;
+
+            continue;
+        }
+
+        outVector = tempOutItr.Get();
+        unsigned int maxIndex = 0;
+        double maxValue = outVector[0];
+
+        for (unsigned int i = 1;i < outVector.GetSize();++i)
+        {
+            if (maxValue < outVector[i])
+            {
+                maxValue = outVector[i];
+                maxIndex = i;
+            }
+        }
+
+        outItr.Set(maxIndex);
+
+        ++outItr;
+        ++maskItr;
+        ++tempOutItr;
     }
 }
 
