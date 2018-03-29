@@ -38,6 +38,7 @@ public:
 
     typedef typename InputImageType::RegionType RegionType;
     typedef typename InputImageType::IndexType IndexType;
+    typedef typename InputImageType::PointType PointType;
 
     typedef typename InputImageType::Pointer InputImagePointer;
     typedef typename InputImageType::IndexType InputImageIndexType;

@@ -256,9 +256,21 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
 
     std::vector <double> labelWeights;
     RegionType patchRegion;
-    IndexType currentIndex;
+    IndexType currentIndex, outIndex;
+    PointType currentPoint, outPoint;
     RegionType largestRegion = this->GetInput()->GetLargestPossibleRegion();
     std::vector <unsigned int> selectedAtlases;
+    VectorType outVector;
+
+    double minSpacing = this->GetInput()->GetSpacing()[0];
+    for (unsigned int i = 1;i < InputImageType::ImageDimension;++i)
+    {
+        if (this->GetInput()->GetSpacing()[i] < minSpacing)
+            minSpacing = this->GetInput()->GetSpacing()[i];
+    }
+
+    double sigmaWeight = m_PatchHalfSize * minSpacing;
+
     while (!maskIterator.IsAtEnd())
     {
         if (maskIterator.Get() == 0)
@@ -272,6 +284,7 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
         }
 
         currentIndex = maskIterator.GetIndex();
+        this->GetInput()->TransformIndexToPhysicalPoint(currentIndex, currentPoint);
 
         patchSearcher.ClearComparisonImages();
         patchSearcher.ClearSegmentationImages();
@@ -350,18 +363,17 @@ NLSegmentationImageFilter <PixelScalarType,PixelOutputScalarType>
         m_LockTemporaryOutputImage.Lock();
 
         OutRegionIteratorType outItr(m_TemporaryOutputImage, outRegion);
-        IndexType outIndex;
-        VectorType outVector;
         while (!outItr.IsAtEnd())
         {
             double distCenter = 0;
             outIndex = outItr.GetIndex();
+            this->GetInput()->TransformIndexToPhysicalPoint(outIndex, outPoint);
 
             for (unsigned int i = 0;i < InputImageType::ImageDimension;++i)
-                distCenter += (outIndex[i] - currentIndex[i]) * (outIndex[i] - currentIndex[i]);
+                distCenter += (outPoint[i] - currentPoint[i]) * (outPoint[i] - currentPoint[i]);
 
             outVector = outItr.Get();
-            outVector[outSegValue] += std::exp(- distCenter / (m_PatchHalfSize * m_PatchHalfSize));
+            outVector[outSegValue] += std::exp(- distCenter / (sigmaWeight * sigmaWeight));
 
             outItr.Set(outVector);
 
