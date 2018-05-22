@@ -49,6 +49,7 @@ CBFEstimationImageFilter <InputPixelType,OutputPixelType>
         if (maskItr.Get() == 0)
         {
             ++maskItr;
+            ++m0Itr;
             ++inputItr;
             ++outItr;
 
@@ -63,6 +64,7 @@ CBFEstimationImageFilter <InputPixelType,OutputPixelType>
         outItr.Set(cbfValue);
         
         ++maskItr;
+        ++m0Itr;
         ++inputItr;
         ++outItr;
     }
