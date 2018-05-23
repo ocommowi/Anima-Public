@@ -43,7 +43,8 @@ CBFEstimationImageFilter <InputPixelType,OutputPixelType>
     OutputImageIteratorType outItr(this->GetOutput(0),outputRegionForThread);
     
     IndexType currentIndex;
-    double constantValue = 6.0e6 * m_LambdaParameter / (m_AlphaParameter * m_BloodT1 * (1.0 - std::exp(- m_LabelDuration / m_BloodT1)));
+    double logConstantValue = std::log(6.0e6) + std::log(m_LambdaParameter) - std::log(m_AlphaParameter) - std::log(m_BloodT1) - std::log(1.0 - std::exp(- m_LabelDuration / m_BloodT1));
+
     while (!inputItr.IsAtEnd())
     {
         if (maskItr.Get() == 0)
@@ -59,7 +60,19 @@ CBFEstimationImageFilter <InputPixelType,OutputPixelType>
         currentIndex = inputItr.GetIndex();
         double currentPLD = currentIndex[InputImageType::ImageDimension - 1] * m_SliceDelay + m_BasePostLabelingDelay;
 
-        double cbfValue = constantValue * inputItr.Get() / (m0Itr.Get() * std::exp(-currentPLD / m_BloodT1));
+        double logM0 = std::log(1.0e-16);
+        if (m0Itr.Get() > 1.0e-16)
+            logM0 = std::log(m0Itr.Get());
+
+        double logInput = std::log(1.0e-16);
+        if (inputItr.Get() > 1.0e-16)
+            logInput = std::log(inputItr.Get());
+
+        double logCBFValue = logConstantValue + logInput - logM0 + currentPLD / m_BloodT1;
+
+        double cbfValue = std::exp(logCBFValue);
+        if (!std::isfinite(cbfValue))
+            cbfValue = 0;
 
         outItr.Set(cbfValue);
         
