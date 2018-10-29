@@ -31,6 +31,9 @@ public:
     virtual ListType &GetSignalAttenuationJacobian(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient) ITK_OVERRIDE;
     virtual double GetLogDiffusionProfile(const Vector3DType &sample) ITK_OVERRIDE;
 
+    virtual double GetLogPriorValue() ITK_OVERRIDE;
+    virtual ListType &GetPriorDerivativeVector() ITK_OVERRIDE;
+
     virtual void SetParametersFromVector(const ListType &params) ITK_OVERRIDE;
     virtual ListType &GetParametersAsVector() ITK_OVERRIDE;
 

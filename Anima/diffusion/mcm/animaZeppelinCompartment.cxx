@@ -1,6 +1,7 @@
 #include <animaZeppelinCompartment.h>
 
 #include <animaVectorOperations.h>
+#include <animaBetaDistribution.h>
 #include <itkSymmetricEigenAnalysis.h>
 #include <animaMCMConstants.h>
 
@@ -17,6 +18,60 @@ double ZeppelinCompartment::GetFourierTransformedDiffusionProfile(double smallDe
     return std::exp(-bValue * (this->GetRadialDiffusivity1()
                                + (this->GetAxialDiffusivity() - this->GetRadialDiffusivity1())
                                * m_GradientEigenvector1 * m_GradientEigenvector1));
+}
+
+double ZeppelinCompartment::GetLogPriorValue()
+{
+    double logPriorValue = 0.0;
+
+    if (m_EstimateDiffusivities)
+    {
+        double faCompartment = this->GetFractionalAnisotropy();
+        logPriorValue = anima::GetBetaLogPDF(faCompartment,m_PriorAlpha,m_PriorBeta);
+    }
+
+    return logPriorValue;
+}
+
+ZeppelinCompartment::ListType &ZeppelinCompartment::GetPriorDerivativeVector()
+{
+    m_PriorDerivativeVector.resize(this->GetNumberOfParameters());
+
+    // No priors on directions
+    m_PriorDerivativeVector[0] = 0.0;
+    m_PriorDerivativeVector[1] = 0.0;
+
+    if (m_EstimateDiffusivities)
+    {
+        // Compute FA derivative
+        double radialDiff = this->GetRadialDiffusivity1();
+        double diffLambdas = this->GetAxialDiffusivity() - radialDiff;
+        m_PriorDerivativeVector[2] = radialDiff * (3.0 * radialDiff + diffLambdas);
+        double denomValue = diffLambdas * (diffLambdas + 2.0 * radialDiff) + 3.0 * radialDiff * radialDiff;
+        denomValue = std::pow(denomValue,-1.5);
+        m_PriorDerivativeVector[2] *= denomValue;
+
+        // Multiply by Beta derivative of FA
+        double faValue = this->GetFractionalAnisotropy();
+        double betaPDFDerivative = anima::GetBetaPDFDerivative(faValue,m_PriorAlpha,m_PriorBeta);
+        m_PriorDerivativeVector[2] *= betaPDFDerivative;
+
+        // Now derivative with respect to smaller lambda
+        m_PriorDerivativeVector[3] = - diffLambdas * (3.0 * radialDiff + diffLambdas);
+        m_PriorDerivativeVector[3] *= betaPDFDerivative * denomValue;
+
+        // And as usual handle bounded vs unbounded parameters
+        if (this->GetUseBoundedOptimization())
+        {
+            m_PriorDerivativeVector[2] *= levenberg::BoundedDerivativeAddOn(diffLambdas, this->GetBoundedSignVectorValue(2),
+                                                                            anima::MCMAxialDiffusivityAddonLowerBound, anima::MCMDiffusivityUpperBound);
+
+            m_PriorDerivativeVector[3] *= levenberg::BoundedDerivativeAddOn(radialDiff, this->GetBoundedSignVectorValue(3),
+                                                                            anima::MCMDiffusivityLowerBound, anima::MCMRadialDiffusivityUpperBound);
+        }
+    }
+
+    return m_PriorDerivativeVector;
 }
 
 ZeppelinCompartment::ListType &ZeppelinCompartment::GetSignalAttenuationJacobian(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient)
@@ -248,12 +303,12 @@ double ZeppelinCompartment::GetApparentFractionalAnisotropy()
 {
     double l1 = this->GetAxialDiffusivity();
     double l2 = this->GetRadialDiffusivity1();
-    double numFA = std::sqrt (2.0 * (l1 - l2) * (l1 - l2));
+    double numFA = l1 - l2;
     double denomFA = std::sqrt (l1 * l1 + 2.0 * l2 * l2);
 
     double fa = 0;
-    if (denomFA != 0)
-        fa = std::sqrt(0.5) * (numFA / denomFA);
+    if (denomFA != 0.0)
+        fa = numFA / denomFA;
 
     return fa;
 }

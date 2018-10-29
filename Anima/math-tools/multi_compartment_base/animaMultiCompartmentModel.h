@@ -60,6 +60,11 @@ public:
     void SetModelVector(const itk::VariableLengthVector <float> &mcmVec);
     void SetModelVector(const ModelOutputVectorType &mcmVec);
 
+    //! Get log prior value for current model parameters
+    double GetLogPriorValue();
+    //! Get log-derivatives of prior for current model parameters
+    ListType &GetPriorDerivatives();
+
     double GetPredictedSignal(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient);
     ListType &GetSignalJacobian(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient);
     double GetDiffusionProfile(Vector3DType &sample);
@@ -129,6 +134,12 @@ private:
 
     //! Working variable for handling model vector representation
     ModelOutputVectorType m_ModelVector;
+
+    //! Vector holding sums of log prior values
+    ListType m_LogPriorSums;
+
+    //! Vector holding prior derivatives
+    ListType m_PriorDerivativesVector;
 };
 
 } // end namespace anima

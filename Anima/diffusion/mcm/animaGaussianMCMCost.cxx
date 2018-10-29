@@ -24,6 +24,11 @@ GaussianMCMCost::GetValues(const ParametersType &parameters)
     m_PredictedSignals.resize(nbImages);
     m_SigmaSquare = 0.0;
 
+    m_LogPriorValue = 0.0;
+    if (m_MAPEstimationMode)
+        m_LogPriorValue = m_MCMStructure->GetLogPriorValue();
+
+    double priorValue = std::exp(- m_LogPriorValue / nbImages);
     for (unsigned int i = 0;i < nbImages;++i)
     {
         m_PredictedSignals[i] = m_MCMStructure->GetPredictedSignal(m_SmallDelta,m_BigDelta,
@@ -31,6 +36,7 @@ GaussianMCMCost::GetValues(const ParametersType &parameters)
 
         m_Residuals[i] = m_ObservedSignals[i] - m_PredictedSignals[i];
         m_SigmaSquare += m_Residuals[i] * m_Residuals[i];
+        m_Residuals[i] *= priorValue;
     }
 
     m_SigmaSquare /= nbImages;
@@ -49,11 +55,12 @@ double GaussianMCMCost::GetCurrentCostValue()
     // This is -2log(L) so that we only have to give one formula
     double costValue = 0;
     unsigned int nbImages = m_Residuals.size();
+    double priorValue = std::exp(- m_LogPriorValue / nbImages);
 
     if (m_MarginalEstimation)
-        costValue = -2.0 * std::log(std::tgamma(1.0 + nbImages / 2.0)) + nbImages * std::log(2.0 * M_PI) + (nbImages + 2.0) * (std::log(nbImages / 2.0) + std::log(m_SigmaSquare));
+        costValue = -2.0 * std::log(std::tgamma(1.0 + nbImages / 2.0)) + nbImages * std::log(2.0 * M_PI) + (nbImages + 2.0) * (std::log(nbImages / 2.0) + std::log(m_SigmaSquare) + 2.0 * std::log(priorValue));
     else
-        costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare));
+        costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare) + 2.0 * std::log(priorValue));
 
     return costValue;
 }
@@ -90,6 +97,22 @@ GaussianMCMCost::GetDerivativeMatrix(const ParametersType &parameters, Derivativ
         for (unsigned int j = 0;j < nbParams;++j)
             derivative.put(i,j,signalJacobians[i][j]);
     }
+
+    if (m_MAPEstimationMode)
+    {
+        std::vector <double> priorDerivatives = m_MCMStructure->GetPriorDerivatives();
+        double priorValue = std::exp(- m_LogPriorValue / nbValues);
+        double diffPriorValue = std::exp(- m_LogPriorValue * (nbValues + 1.0) / nbValues);
+
+        for (unsigned int i = 0;i < nbValues;++i)
+        {
+            for (unsigned int j = 0;j < nbParams;++j)
+            {
+                derivative(j,i) *= priorValue;
+                derivative(j,i) -= (m_PredictedSignals[i] - m_ObservedSignals[i]) * priorDerivatives[j] * diffPriorValue / nbValues;
+            }
+        }
+    }
 }
 
 void
@@ -100,16 +123,19 @@ GaussianMCMCost::GetCurrentDerivative(DerivativeMatrixType &derivativeMatrix, De
 
     derivative.set_size(nbParams);
 
+    double priorValue = std::exp(- m_LogPriorValue /nbValues);
+    double priorSquared = std::exp(- 2.0 * m_LogPriorValue /nbValues);
+
     for (unsigned int j = 0;j < nbParams;++j)
     {
         double residualJacobianResidualProduct = 0;
         for (unsigned int i = 0;i < nbValues;++i)
-            residualJacobianResidualProduct += derivativeMatrix(i,j) * m_Residuals[i];
+            residualJacobianResidualProduct += derivativeMatrix(i,j) * m_Residuals[i] * priorValue;
 
         if (!m_MarginalEstimation)
-            derivative[j] = 2.0 * residualJacobianResidualProduct / m_SigmaSquare;
+            derivative[j] = 2.0 * residualJacobianResidualProduct / (m_SigmaSquare * priorSquared);
         else
-            derivative[j] = 2.0 * (nbValues + 2.0) * residualJacobianResidualProduct / (nbValues * m_SigmaSquare);
+            derivative[j] = 2.0 * (nbValues + 2.0) * residualJacobianResidualProduct / (nbValues * m_SigmaSquare * priorSquared);
     }
 }
     

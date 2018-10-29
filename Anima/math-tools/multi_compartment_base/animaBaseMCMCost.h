@@ -73,6 +73,9 @@ public:
     void SetSmallDelta(double val) {m_SmallDelta = val;}
     void SetBigDelta(double val) {m_BigDelta = val;}
 
+    //! Switches modes between MAP estimation and MLE estimation
+    void SetMAPEstimationMode(bool val) {m_MAPEstimationMode = val;}
+
 protected:
     BaseMCMCost();
     virtual ~BaseMCMCost() {}
@@ -88,6 +91,9 @@ protected:
     double m_SmallDelta;
     double m_BigDelta;
     ListType m_GradientStrengths;
+
+    bool m_MAPEstimationMode;
+    double m_LogPriorValue;
 
     MCMPointer m_MCMStructure;
 

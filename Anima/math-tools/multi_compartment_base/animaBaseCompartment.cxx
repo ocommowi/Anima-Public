@@ -6,11 +6,22 @@
 namespace anima
 {
 
+const double BaseCompartment::m_PriorAlpha = 10.0;
+const double BaseCompartment::m_PriorBeta = 4.0;
+
 double BaseCompartment::GetPredictedSignal(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient)
 {
     double ftDiffusionProfile = GetFourierTransformedDiffusionProfile(smallDelta,bigDelta, gradientStrength, gradient);
 
     return std::abs(ftDiffusionProfile);
+}
+
+BaseCompartment::ListType &BaseCompartment::GetPriorDerivativeVector()
+{
+    m_PriorDerivativeVector.resize(this->GetNumberOfParameters());
+    std::fill(m_PriorDerivativeVector.begin(),m_PriorDerivativeVector.end(),0.0);
+
+    return m_PriorDerivativeVector;
 }
 
 bool BaseCompartment::IsEqual(Self *rhs, double tolerance, double absoluteTolerance)

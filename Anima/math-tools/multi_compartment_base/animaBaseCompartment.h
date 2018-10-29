@@ -51,6 +51,12 @@ public:
     virtual ListType &GetSignalAttenuationJacobian(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient) = 0;
     virtual double GetLogDiffusionProfile(const Vector3DType &sample) = 0;
 
+    //! Get prior on parameters value for the current compartment parameters
+    virtual double GetLogPriorValue() {return 0.0;}
+
+    //! Get prior on parameters derivatives with respect to optimized parameters for the current compartment parameters
+    virtual ListType &GetPriorDerivativeVector();
+
     //! Various methods for optimization parameters setting and getting
     virtual void SetParametersFromVector(const ListType &params) = 0;
     virtual ListType &GetParametersAsVector() = 0;
@@ -142,6 +148,9 @@ protected:
     //! Vector holding current jacobian value
     ListType m_JacobianVector;
 
+    //! Vector holding current prior derivatives
+    ListType m_PriorDerivativeVector;
+
     //! Vector holding current parameters vector
     ListType m_ParametersVector;
 
@@ -153,6 +162,9 @@ protected:
 
     //! Vector to hold working value of compartment vector
     ModelOutputVectorType m_CompartmentVector;
+
+    static const double m_PriorAlpha;
+    static const double m_PriorBeta;
 
 private:
     double m_OrientationTheta, m_OrientationPhi;

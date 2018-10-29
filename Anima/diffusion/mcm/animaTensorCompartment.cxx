@@ -3,6 +3,7 @@
 #include <itkSymmetricEigenAnalysis.h>
 #include <animaBaseTensorTools.h>
 #include <animaMCMConstants.h>
+#include <animaBetaDistribution.h>
 
 namespace anima
 {
@@ -23,6 +24,72 @@ double TensorCompartment::GetFourierTransformedDiffusionProfile(double smallDelt
     double bValue = anima::GetBValueFromAcquisitionParameters(smallDelta, bigDelta, gradientStrength);
 
     return std::exp(- bValue * quadForm);
+}
+
+double TensorCompartment::GetLogPriorValue()
+{
+    double logPriorValue = 0.0;
+
+    if (m_EstimateDiffusivities)
+    {
+        double faCompartment = this->GetFractionalAnisotropy();
+        logPriorValue = anima::GetBetaLogPDF(faCompartment,m_PriorAlpha,m_PriorBeta);
+    }
+
+    return logPriorValue;
+}
+
+TensorCompartment::ListType &TensorCompartment::GetPriorDerivativeVector()
+{
+    m_PriorDerivativeVector.resize(this->GetNumberOfParameters());
+
+    // No priors on directions
+    m_PriorDerivativeVector[0] = 0.0;
+    m_PriorDerivativeVector[1] = 0.0;
+    m_PriorDerivativeVector[2] = 0.0;
+
+    if (m_EstimateDiffusivities)
+    {
+        // Compute FA derivative
+        double axialDiff = this->GetAxialDiffusivity();
+        double radialDiff1 = this->GetRadialDiffusivity1();
+        double radialDiff2 = this->GetRadialDiffusivity2();
+        double diffHighLambdas = axialDiff - radialDiff1;
+        double diffLowLambdas = radialDiff1 - radialDiff2;
+        double denomValue = axialDiff * axialDiff + radialDiff1 * radialDiff1 + radialDiff2 * radialDiff2;
+        denomValue = std::pow(denomValue,-1.5);
+
+        double numFAValue = std::sqrt(diffHighLambdas * (diffHighLambdas + diffLowLambdas) + diffLowLambdas * diffLowLambdas);
+        double sumLambdas = axialDiff + radialDiff1 + radialDiff2;
+        m_PriorDerivativeVector[3] = diffHighLambdas * (radialDiff1 + radialDiff2) + radialDiff2 * diffLowLambdas;
+        m_PriorDerivativeVector[3] *= sumLambdas * denomValue / (2.0 * numFAValue);
+
+        // Multiply by Beta derivative of FA
+        double faValue = this->GetFractionalAnisotropy();
+        double betaPDFDerivative = anima::GetBetaPDFDerivative(faValue,m_PriorAlpha,m_PriorBeta);
+        m_PriorDerivativeVector[3] *= betaPDFDerivative;
+
+        // Now other derivatives
+        m_PriorDerivativeVector[4] = - diffHighLambdas * diffHighLambdas + radialDiff2 * (diffHighLambdas + 2.0 * diffLowLambdas);
+        m_PriorDerivativeVector[4] *= betaPDFDerivative * sumLambdas * denomValue / (2.0 * numFAValue);
+
+        m_PriorDerivativeVector[5] = - numFAValue * betaPDFDerivative * sumLambdas * denomValue;
+
+        // And as usual handle bounded vs unbounded parameters
+        if (this->GetUseBoundedOptimization())
+        {
+            m_PriorDerivativeVector[3] *= levenberg::BoundedDerivativeAddOn(diffHighLambdas, this->GetBoundedSignVectorValue(3),
+                                                                            anima::MCMAxialDiffusivityAddonLowerBound, anima::MCMDiffusivityUpperBound);
+
+            m_PriorDerivativeVector[4] *= levenberg::BoundedDerivativeAddOn(diffLowLambdas, this->GetBoundedSignVectorValue(4),
+                                                                            anima::MCMZeroLowerBound, anima::MCMDiffusivityUpperBound);
+
+            m_PriorDerivativeVector[5] *= levenberg::BoundedDerivativeAddOn(radialDiff2, this->GetBoundedSignVectorValue(5),
+                                                                            anima::MCMDiffusivityLowerBound, anima::MCMRadialDiffusivityUpperBound);
+        }
+    }
+
+    return m_PriorDerivativeVector;
 }
 
 TensorCompartment::ListType &TensorCompartment::GetSignalAttenuationJacobian(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient)

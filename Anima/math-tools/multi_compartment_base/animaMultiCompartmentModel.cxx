@@ -229,6 +229,52 @@ void MultiCompartmentModel::SetModelVector(const ModelOutputVectorType &mcmVec)
     }
 }
 
+double MultiCompartmentModel::GetLogPriorValue()
+{
+    double logPriorValue = 0.0;
+
+    m_LogPriorSums.resize(m_Compartments.size());
+    std::fill(m_LogPriorSums.begin(),m_LogPriorSums.end(),0.0);
+
+    for (unsigned int i = 0;i < m_Compartments.size();++i)
+    {
+        double logPriorCompartment = m_Compartments[i]->GetLogPriorValue();
+        for (unsigned int j = 0;j < m_Compartments.size();++j)
+        {
+            if (i != j)
+                m_LogPriorSums[j] += logPriorCompartment;
+        }
+
+        logPriorValue += logPriorCompartment;
+    }
+
+    return logPriorValue;
+}
+
+MultiCompartmentModel::ListType &MultiCompartmentModel::GetPriorDerivatives()
+{
+    unsigned int numWeightsToOptimize = this->GetNumberOfOptimizedWeights();
+    unsigned int derivativeSize = numWeightsToOptimize;
+    for (unsigned int i = 0;i < m_Compartments.size();++i)
+        derivativeSize += m_Compartments[i]->GetNumberOfParameters();
+
+    unsigned int pos = numWeightsToOptimize;
+    m_PriorDerivativesVector.resize(derivativeSize);
+    std::fill(m_PriorDerivativesVector.begin(),m_PriorDerivativesVector.end(),0.0);
+
+    for (unsigned int i = 0;i < m_Compartments.size();++i)
+    {
+        m_WorkVector = m_Compartments[i]->GetPriorDerivativeVector();
+
+        for (unsigned int j = 0;j < m_WorkVector.size();++j)
+            m_PriorDerivativesVector[pos + j] = m_WorkVector[j] * std::exp(m_LogPriorSums[i]);
+
+        pos += m_WorkVector.size();
+    }
+
+    return m_PriorDerivativesVector;
+}
+
 double MultiCompartmentModel::GetPredictedSignal(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient)
 {
     double ftDiffusionProfile = 0;
@@ -244,12 +290,10 @@ double MultiCompartmentModel::GetPredictedSignal(double smallDelta, double bigDe
     
 MultiCompartmentModel::ListType &MultiCompartmentModel::GetSignalJacobian(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient)
 {
-    unsigned int jacobianSize = 0;
+    unsigned int numWeightsToOptimize = this->GetNumberOfOptimizedWeights();
+    unsigned int jacobianSize = numWeightsToOptimize;
     for (unsigned int i = 0;i < m_Compartments.size();++i)
         jacobianSize += m_Compartments[i]->GetNumberOfParameters();
-
-    unsigned int numWeightsToOptimize = this->GetNumberOfOptimizedWeights();
-    jacobianSize += numWeightsToOptimize;
     
     m_JacobianVector.resize(jacobianSize);
     std::fill(m_JacobianVector.begin(), m_JacobianVector.end(), 0.0);
