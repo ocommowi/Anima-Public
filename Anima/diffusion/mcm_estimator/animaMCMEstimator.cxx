@@ -72,6 +72,7 @@ int main(int argc,  char **argv)
     TCLAP::ValueArg<std::string> optimizerArg("", "optimizer", "Optimizer for estimation: bobyqa (default), ccsaq, bfgs or levenberg", false, "bobyqa", "optimizer", cmd);
     TCLAP::ValueArg<double> absCostChangeArg("", "abs-cost-change", "Cost function change to stop estimation (default: 0.01)", false, 0.01, "cost change threshold", cmd);
     TCLAP::ValueArg <unsigned int> mlModeArg("", "ml-mode", "ML estimation strategy: marginal likelihood (0), profile likelihood (1, default), Variable projection (2)", false, 1, "ML mode", cmd);
+    TCLAP::SwitchArg mapEstimationArg("", "map", "Use prior on parameters? (MAP estimation)", cmd, false);
     TCLAP::ValueArg<double> xTolArg("x", "x-tol", "Tolerance for relative position in optimization (default: 0 -> 1.0e-4 or 1.0e-7 for bobyqa)", false, 0, "position relative tolerance", cmd);
     TCLAP::ValueArg<double> fTolArg("", "f-tol", "Tolerance for relative cost in optimization (default: 0 -> function of position tolerance)", false, 0, "cost relative tolerance", cmd);
     TCLAP::ValueArg<unsigned int> maxEvalArg("e", "max-eval", "Maximum evaluations (default: 0 -> function of number of unknowns)", false, 0, "max evaluations", cmd);
@@ -143,6 +144,8 @@ int main(int argc,  char **argv)
         filter->SetMoseVolume(anima::readImage<FilterType::MoseImageType>(inMoseArg.getValue()));
 
     filter->SetB0Threshold(b0thrArg.getValue());
+    
+    filter->SetUseMAPEstimation(mapEstimationArg.getValue());
 
     filter->SetModelWithFreeWaterComponent(freeWaterCompartmentArg.isSet());
     filter->SetModelWithStationaryWaterComponent(stationaryWaterCompartmentArg.isSet());

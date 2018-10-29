@@ -98,6 +98,9 @@ public:
     void SetOptimizer(std::string &opt) {m_Optimizer = opt;}
     itkSetMacro(AbsoluteCostChange, double)
 
+    itkSetMacro(UseMAPEstimation, bool)
+    itkGetMacro(UseMAPEstimation, bool)
+
     itkSetMacro(MLEstimationStrategy, MaximumLikelihoodEstimationMode)
     itkGetMacro(MLEstimationStrategy, MaximumLikelihoodEstimationMode)
 
@@ -174,6 +177,8 @@ protected:
         m_Optimizer = "bobyqa";
         m_AbsoluteCostChange = 0.01;
         m_B0Threshold = 0;
+
+        m_UseMAPEstimation = false;
         m_MLEstimationStrategy = Marginal;
 
         m_ModelWithFreeWaterComponent = true;
@@ -317,6 +322,7 @@ private:
 
     double m_AbsoluteCostChange;
     MaximumLikelihoodEstimationMode m_MLEstimationStrategy;
+    bool m_UseMAPEstimation;
 
     bool m_ModelWithFreeWaterComponent, m_ModelWithStationaryWaterComponent, m_ModelWithRestrictedWaterComponent, m_ModelWithStaniszComponent;
 
