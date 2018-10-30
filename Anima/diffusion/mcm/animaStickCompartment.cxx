@@ -26,7 +26,7 @@ double StickCompartment::GetLogPriorValue()
     if (m_EstimateAxialDiffusivity)
     {
         double faCompartment = this->GetFractionalAnisotropy();
-        logPriorValue = anima::GetBetaLogPDF(faCompartment,m_PriorAlpha,m_PriorBeta);
+        logPriorValue = anima::GetBetaLogPDF(faCompartment,anima::MCMPriorAlpha,anima::MCMPriorBeta);
     }
 
     return logPriorValue;
@@ -51,12 +51,12 @@ StickCompartment::ListType &StickCompartment::GetPriorDerivativeVector()
 
         // Multiply by Beta derivative of FA
         double faValue = this->GetFractionalAnisotropy();
-        m_PriorDerivativeVector[2] *= anima::GetBetaPDFDerivative(faValue,m_PriorAlpha,m_PriorBeta);
+        m_PriorDerivativeVector[2] *= anima::GetBetaPDFDerivative(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta);
 
         if (this->GetUseBoundedOptimization())
         {
             m_PriorDerivativeVector[2] *= levenberg::BoundedDerivativeAddOn(diffLambdas, this->GetBoundedSignVectorValue(2),
-                                                                            anima::MCMAxialDiffusivityAddonLowerBound, anima::MCMDiffusivityUpperBound);
+                                                                            anima::MCMZeroLowerBound, anima::MCMDiffusivityUpperBound);
         }
     }
 
@@ -133,9 +133,6 @@ StickCompartment::ListType &StickCompartment::GetParameterLowerBounds()
 {
     m_ParametersLowerBoundsVector.resize(this->GetNumberOfParameters());
     std::fill(m_ParametersLowerBoundsVector.begin(),m_ParametersLowerBoundsVector.end(),anima::MCMZeroLowerBound);
-
-    if (m_EstimateAxialDiffusivity)
-        m_ParametersLowerBoundsVector[2] = anima::MCMAxialDiffusivityAddonLowerBound;
 
     return m_ParametersLowerBoundsVector;
 }

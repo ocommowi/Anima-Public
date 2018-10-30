@@ -163,9 +163,6 @@ protected:
     //! Vector to hold working value of compartment vector
     ModelOutputVectorType m_CompartmentVector;
 
-    static const double m_PriorAlpha;
-    static const double m_PriorBeta;
-
 private:
     double m_OrientationTheta, m_OrientationPhi;
     double m_PerpendicularAngle;

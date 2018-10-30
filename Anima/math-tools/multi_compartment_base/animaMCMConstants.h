@@ -38,8 +38,11 @@ const double MCMEpsilon = 1.0e-2;
 //! Compartment fractions upper bound (B0 times weight)
 const double MCMCompartmentsFractionUpperBound = 1.0e7;
 
-//! Axial diffusivity add on to lower bound (used to ensure a minimal anisotropy to the anisotropic compartments)
-const double MCMAxialDiffusivityAddonLowerBound = 5.0e-4;
+//! Beta distribution prior alpha shape value
+const double MCMPriorAlpha = 20.0;
+
+//! Beta distribution prior beta shape value
+const double MCMPriorBeta = 8.0;
 
 //! Diffusivity lower bound for estimation
 const double MCMDiffusivityLowerBound = 1.0e-6;

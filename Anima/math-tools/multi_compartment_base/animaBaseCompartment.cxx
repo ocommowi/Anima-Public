@@ -6,9 +6,6 @@
 namespace anima
 {
 
-const double BaseCompartment::m_PriorAlpha = 10.0;
-const double BaseCompartment::m_PriorBeta = 4.0;
-
 double BaseCompartment::GetPredictedSignal(double smallDelta, double bigDelta, double gradientStrength, const Vector3DType &gradient)
 {
     double ftDiffusionProfile = GetFourierTransformedDiffusionProfile(smallDelta,bigDelta, gradientStrength, gradient);

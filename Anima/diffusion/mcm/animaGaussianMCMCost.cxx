@@ -122,15 +122,13 @@ GaussianMCMCost::GetCurrentDerivative(DerivativeMatrixType &derivativeMatrix, De
     unsigned int nbValues = derivativeMatrix.rows();
 
     derivative.set_size(nbParams);
-
-    double priorValue = std::exp(- m_LogPriorValue /nbValues);
     double priorSquared = std::exp(- 2.0 * m_LogPriorValue /nbValues);
 
     for (unsigned int j = 0;j < nbParams;++j)
     {
         double residualJacobianResidualProduct = 0;
         for (unsigned int i = 0;i < nbValues;++i)
-            residualJacobianResidualProduct += derivativeMatrix(i,j) * m_Residuals[i] * priorValue;
+            residualJacobianResidualProduct += derivativeMatrix(i,j) * m_Residuals[i];
 
         if (!m_MarginalEstimation)
             derivative[j] = 2.0 * residualJacobianResidualProduct / (m_SigmaSquare * priorSquared);

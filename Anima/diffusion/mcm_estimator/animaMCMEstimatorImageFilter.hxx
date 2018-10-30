@@ -1085,9 +1085,6 @@ MCMEstimatorImageFilter<InputPixelType, OutputPixelType>
         meanRadialDiff = (m_RadialDiffusivity1Value + m_RadialDiffusivity2Value) / 2.0;
     }
 
-    if (meanAxialDiff - meanRadialDiff < anima::MCMAxialDiffusivityAddonLowerBound)
-        meanAxialDiff = meanRadialDiff + anima::MCMAxialDiffusivityAddonLowerBound;
-
     for (unsigned int i = numIsoCompartments;i < numCompartments;++i)
         mcmUpdateValue->GetCompartment(i)->SetAxialDiffusivity(meanAxialDiff);
 
@@ -1104,8 +1101,6 @@ MCMEstimatorImageFilter<InputPixelType, OutputPixelType>
 
             // In between meanRD and (meanRD + meanAD) / 2
             double tmpRadialDiffusivity1 = 0.5 * ((1.0 + tmpWeight1) * meanRadialDiff + (1.0 - tmpWeight1) * meanAxialDiff);
-            if (meanAxialDiff - tmpRadialDiffusivity1 < anima::MCMAxialDiffusivityAddonLowerBound)
-                continue;
 
             for (unsigned int j = 0;j < m_ValuesCoarseGrid[0].size();++j)
             {

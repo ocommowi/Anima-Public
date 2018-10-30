@@ -35,8 +35,9 @@ double GaussianMCMVariableProjectionCost::GetCurrentCostValue()
     // This is -2log(L) so that we only have to give one formula
     double costValue = 0;
     unsigned int nbImages = m_Residuals.size();
+    double priorValue = std::exp(- m_LogPriorValue / nbImages);
 
-    costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare));
+    costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare) + 2.0 * std::log(priorValue));
 
     return costValue;
 }
@@ -48,7 +49,8 @@ GaussianMCMVariableProjectionCost::SolveLinearLeastSquares()
     unsigned int numCompartments = m_IndexesUsefulCompartments.size();
 
     m_SigmaSquare = 0.0;
-
+    double priorValue = std::exp(- m_LogPriorValue / nbValues);
+    
     for (unsigned int i = 0;i < nbValues;++i)
     {
         m_Residuals[i] = m_ObservedSignals[i];
@@ -56,6 +58,7 @@ GaussianMCMVariableProjectionCost::SolveLinearLeastSquares()
             m_Residuals[i] -= m_PredictedSignalAttenuations.get(i,j) * m_OptimalUsefulWeights[j];
 
         m_SigmaSquare += m_Residuals[i] * m_Residuals[i];
+        m_Residuals[i] *= priorValue;
     }
 
     m_SigmaSquare /= nbValues;
@@ -230,6 +233,10 @@ GaussianMCMVariableProjectionCost::PrepareDataForLLS()
     }
 
     m_Residuals.SetSize(nbValues);
+    
+    m_LogPriorValue = 0.0;
+    if (m_MAPEstimationMode)
+        m_LogPriorValue = m_MCMStructure->GetLogPriorValue();
 }
 
 void
@@ -348,6 +355,7 @@ GaussianMCMVariableProjectionCost::GetDerivativeMatrix(const ParametersType &par
     ListType DFw(nbValues,0.0);
 
     ListType tmpVec(numOnCompartments,0.0);
+    double priorValue = std::exp(- m_LogPriorValue / nbValues);
 
     for (unsigned int k = 0;k < nbParams;++k)
     {
@@ -359,6 +367,8 @@ GaussianMCMVariableProjectionCost::GetDerivativeMatrix(const ParametersType &par
             DFw[i] = 0.0;
             for (unsigned int j = 0;j < numCompartments;++j)
                 DFw[i] += m_SignalAttenuationsJacobian[k].get(i,j) * m_OptimalUsefulWeights[j];
+            
+            DFw[i] *= priorValue;
         }
 
         // Then, compute
@@ -387,6 +397,19 @@ GaussianMCMVariableProjectionCost::GetDerivativeMatrix(const ParametersType &par
                 derivativeVal += m_FMatrixInverseG.get(i,j) * tmpVec[j];
 
             derivative.put(i,k,derivativeVal);
+        }
+        
+        if (m_MAPEstimationMode)
+        {
+            std::vector <double> priorDerivatives = m_MCMStructure->GetPriorDerivatives();
+            double diffPriorValue = std::exp(- m_LogPriorValue);
+            
+            for (unsigned int i = 0;i < nbValues;++i)
+            {
+                for (unsigned int j = 0;j < nbParams;++j)
+                    derivative(j,i) -= m_Residuals[i] * priorDerivatives[j] * diffPriorValue / nbValues;
+            }
+
         }
     }
 
@@ -421,13 +444,15 @@ GaussianMCMVariableProjectionCost::GetCurrentDerivative(DerivativeMatrixType &de
     // Current derivative of the system is 2 residual^T derivativeMatrix
     // To handle the fact that the cost function is -2 log(L) and not the rms problem itself
     derivative.set_size(nbParams);
+    double priorSquared = std::exp(- 2.0 * m_LogPriorValue /nbValues);
+
     for (unsigned int i = 0;i < nbParams;++i)
     {
         derivative[i] = 0.0;
         for (unsigned int j = 0;j < nbValues;++j)
             derivative[i] += m_Residuals[j] * derivativeMatrix.get(j,i);
 
-        derivative[i] *= 2.0 / m_SigmaSquare;
+        derivative[i] *= 2.0 / (m_SigmaSquare * priorSquared);
     }
 }
 
