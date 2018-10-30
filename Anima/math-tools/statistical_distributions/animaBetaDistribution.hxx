@@ -22,9 +22,9 @@ ScalarType GetBetaPDFDerivative(ScalarType x, ScalarType alpha, ScalarType beta)
 {
     double logBetaConstant = std::log(std::tgamma(alpha + beta)) - std::log(std::tgamma(alpha)) - std::log(std::tgamma(beta));
     double logDiffValue = logBetaConstant + (alpha - 2.0) * std::log(std::max(1.0e-8,x)) + (beta - 2.0) * std::log(std::max(1.0 - x,1.0e-8));
-    logDiffValue += std::log((alpha - 1.0) * (1.0 - x) - (beta - 1.0) * x);
+    double diffValue = ((alpha - 1.0) * (1.0 - x) - (beta - 1.0) * x) * std::exp(logDiffValue);
 
-    return std::exp(logDiffValue);
+    return diffValue;
 }
 
 } // end namespace anima
