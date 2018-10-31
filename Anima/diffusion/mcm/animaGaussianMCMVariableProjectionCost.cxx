@@ -35,9 +35,8 @@ double GaussianMCMVariableProjectionCost::GetCurrentCostValue()
     // This is -2log(L) so that we only have to give one formula
     double costValue = 0;
     unsigned int nbImages = m_Residuals.size();
-    double priorValue = std::exp(- m_LogPriorValue / nbImages);
 
-    costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare) + 2.0 * std::log(priorValue));
+    costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare)) - 2.0 * m_LogPriorValue;
 
     return costValue;
 }

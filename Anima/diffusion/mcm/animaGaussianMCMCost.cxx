@@ -55,12 +55,11 @@ double GaussianMCMCost::GetCurrentCostValue()
     // This is -2log(L) so that we only have to give one formula
     double costValue = 0;
     unsigned int nbImages = m_Residuals.size();
-    double priorValue = std::exp(- m_LogPriorValue / nbImages);
 
     if (m_MarginalEstimation)
-        costValue = -2.0 * std::log(std::tgamma(1.0 + nbImages / 2.0)) + nbImages * std::log(2.0 * M_PI) + (nbImages + 2.0) * (std::log(nbImages / 2.0) + std::log(m_SigmaSquare) + 2.0 * std::log(priorValue));
+        costValue = -2.0 * std::log(std::tgamma(1.0 + nbImages / 2.0)) + nbImages * std::log(2.0 * M_PI) + (nbImages + 2.0) * (std::log(nbImages / 2.0) + std::log(m_SigmaSquare) - 2.0 * m_LogPriorValue / nbImages);
     else
-        costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare) + 2.0 * std::log(priorValue));
+        costValue = nbImages * (1.0 + std::log(2.0 * M_PI * m_SigmaSquare)) - 2.0 * m_LogPriorValue;
 
     return costValue;
 }
