@@ -27,6 +27,9 @@ double StickCompartment::GetLogPriorValue()
     {
         double faCompartment = this->GetFractionalAnisotropy();
         logPriorValue = anima::GetBetaLogPDF(faCompartment,anima::MCMPriorAlpha,anima::MCMPriorBeta);
+        double diffAxDiff = this->GetAxialDiffusivity() - anima::MCMGaussianPriorMuAxialDiffusivity;
+        logPriorValue -= diffAxDiff * diffAxDiff / (2.0 * anima::MCMGaussianPriorSigmaAxialDiffusivity * anima::MCMGaussianPriorSigmaAxialDiffusivity);
+        logPriorValue -= 0.5 * std::log(2.0 * M_PI) + std::log(anima::MCMGaussianPriorSigmaAxialDiffusivity);
     }
 
     return logPriorValue;
@@ -45,13 +48,24 @@ StickCompartment::ListType &StickCompartment::GetPriorDerivativeVector()
         // Compute FA derivative
         double radialDiff = this->GetRadialDiffusivity1();
         double diffLambdas = this->GetAxialDiffusivity() - radialDiff;
-        m_PriorDerivativeVector[2] = radialDiff * (3.0 * radialDiff + diffLambdas);
+        double betaPriorDerivative = radialDiff * (3.0 * radialDiff + diffLambdas);
         double denomValue = diffLambdas * (diffLambdas + 2.0 * radialDiff) + 3.0 * radialDiff * radialDiff;
-        m_PriorDerivativeVector[2] *= std::pow(denomValue,-1.5);
+        betaPriorDerivative *= std::pow(denomValue,-1.5);
 
         // Multiply by Beta derivative of FA
         double faValue = this->GetFractionalAnisotropy();
-        m_PriorDerivativeVector[2] *= anima::GetBetaPDFDerivative(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta);
+        betaPriorDerivative *= anima::GetBetaPDFDerivative(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta);
+
+        // Compute individual prior values
+        double priorBeta = std::exp(anima::GetBetaLogPDF(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta));
+        double diffAxDiff = this->GetAxialDiffusivity() - anima::MCMGaussianPriorMuAxialDiffusivity;
+        double expValue = std::exp(- diffAxDiff * diffAxDiff / (2.0 * anima::MCMGaussianPriorSigmaAxialDiffusivity * anima::MCMGaussianPriorSigmaAxialDiffusivity));
+        double priorLambda = expValue / (std::sqrt(2.0 * M_PI) * anima::MCMGaussianPriorSigmaAxialDiffusivity);
+
+        // Compute lambda prior derivative
+        double lambdaPriorDerivative = expValue / (std::sqrt(2.0 * M_PI) * std::pow(anima::MCMGaussianPriorSigmaAxialDiffusivity, 3.0));
+
+        m_PriorDerivativeVector[2] = betaPriorDerivative * priorLambda + priorBeta * lambdaPriorDerivative;
 
         if (this->GetUseBoundedOptimization())
         {

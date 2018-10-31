@@ -28,6 +28,9 @@ double ZeppelinCompartment::GetLogPriorValue()
     {
         double faCompartment = this->GetFractionalAnisotropy();
         logPriorValue = anima::GetBetaLogPDF(faCompartment,anima::MCMPriorAlpha,anima::MCMPriorBeta);
+        double diffAxDiff = this->GetAxialDiffusivity() - anima::MCMGaussianPriorMuAxialDiffusivity;
+        logPriorValue -= diffAxDiff * diffAxDiff / (2.0 * anima::MCMGaussianPriorSigmaAxialDiffusivity * anima::MCMGaussianPriorSigmaAxialDiffusivity);
+        logPriorValue -= 0.5 * std::log(2.0 * M_PI) + std::log(anima::MCMGaussianPriorSigmaAxialDiffusivity);
     }
 
     return logPriorValue;
@@ -43,22 +46,33 @@ ZeppelinCompartment::ListType &ZeppelinCompartment::GetPriorDerivativeVector()
 
     if (m_EstimateDiffusivities)
     {
+        // Compute individual prior values
+        double faValue = this->GetFractionalAnisotropy();
+        double priorBeta = std::exp(anima::GetBetaLogPDF(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta));
+        double diffAxDiff = this->GetAxialDiffusivity() - anima::MCMGaussianPriorMuAxialDiffusivity;
+        double expValue = std::exp(- diffAxDiff * diffAxDiff / (2.0 * anima::MCMGaussianPriorSigmaAxialDiffusivity * anima::MCMGaussianPriorSigmaAxialDiffusivity));
+        double priorLambda = expValue / (std::sqrt(2.0 * M_PI) * anima::MCMGaussianPriorSigmaAxialDiffusivity);
+
+        // Compute lambda prior derivative
+        double lambdaPriorDerivative = expValue / (std::sqrt(2.0 * M_PI) * std::pow(anima::MCMGaussianPriorSigmaAxialDiffusivity, 3.0));
+
         // Compute FA derivative
         double radialDiff = this->GetRadialDiffusivity1();
         double diffLambdas = this->GetAxialDiffusivity() - radialDiff;
-        m_PriorDerivativeVector[2] = radialDiff * (3.0 * radialDiff + diffLambdas);
+        double betaPriorDerivative = radialDiff * (3.0 * radialDiff + diffLambdas);
         double denomValue = diffLambdas * (diffLambdas + 2.0 * radialDiff) + 3.0 * radialDiff * radialDiff;
         denomValue = std::pow(denomValue,-1.5);
-        m_PriorDerivativeVector[2] *= denomValue;
+        betaPriorDerivative *= denomValue;
 
         // Multiply by Beta derivative of FA
-        double faValue = this->GetFractionalAnisotropy();
         double betaPDFDerivative = anima::GetBetaPDFDerivative(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta);
-        m_PriorDerivativeVector[2] *= betaPDFDerivative;
+        betaPriorDerivative *= betaPDFDerivative;
+        m_PriorDerivativeVector[2] = betaPriorDerivative * priorLambda + priorBeta * lambdaPriorDerivative;
 
         // Now derivative with respect to smaller lambda
-        m_PriorDerivativeVector[3] = - diffLambdas * (3.0 * radialDiff + diffLambdas);
-        m_PriorDerivativeVector[3] *= betaPDFDerivative * denomValue;
+        betaPriorDerivative = - diffLambdas * (3.0 * radialDiff + diffLambdas);
+        betaPriorDerivative *= betaPDFDerivative * denomValue;
+        m_PriorDerivativeVector[3] = betaPriorDerivative * priorLambda + priorBeta * lambdaPriorDerivative;
 
         // And as usual handle bounded vs unbounded parameters
         if (this->GetUseBoundedOptimization())

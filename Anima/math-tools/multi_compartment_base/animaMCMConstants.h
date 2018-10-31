@@ -39,10 +39,16 @@ const double MCMEpsilon = 1.0e-2;
 const double MCMCompartmentsFractionUpperBound = 1.0e7;
 
 //! Beta distribution prior alpha shape value
-const double MCMPriorAlpha = 20.0;
+const double MCMPriorAlpha = 10.0;
 
 //! Beta distribution prior beta shape value
-const double MCMPriorBeta = 8.0;
+const double MCMPriorBeta = 4.0;
+
+//! Gaussian distribution prior mu value
+const double MCMGaussianPriorMuAxialDiffusivity = 1.71e-3;
+
+//! Gaussian distribution prior sigma value
+const double MCMGaussianPriorSigmaAxialDiffusivity = 0.5e-3;
 
 //! Diffusivity lower bound for estimation
 const double MCMDiffusivityLowerBound = 1.0e-6;
