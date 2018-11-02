@@ -54,7 +54,7 @@ ZeppelinCompartment::ListType &ZeppelinCompartment::GetPriorDerivativeVector()
         double priorLambda = expValue / (std::sqrt(2.0 * M_PI) * anima::MCMGaussianPriorSigmaAxialDiffusivity);
 
         // Compute lambda prior derivative
-        double lambdaPriorDerivative = expValue / (std::sqrt(2.0 * M_PI) * std::pow(anima::MCMGaussianPriorSigmaAxialDiffusivity, 3.0));
+        double lambdaPriorDerivative = - diffAxDiff * expValue / (std::sqrt(2.0 * M_PI) * std::pow(anima::MCMGaussianPriorSigmaAxialDiffusivity, 3.0));
 
         // Compute FA derivative
         double radialDiff = this->GetRadialDiffusivity1();

@@ -63,7 +63,7 @@ StickCompartment::ListType &StickCompartment::GetPriorDerivativeVector()
         double priorLambda = expValue / (std::sqrt(2.0 * M_PI) * anima::MCMGaussianPriorSigmaAxialDiffusivity);
 
         // Compute lambda prior derivative
-        double lambdaPriorDerivative = expValue / (std::sqrt(2.0 * M_PI) * std::pow(anima::MCMGaussianPriorSigmaAxialDiffusivity, 3.0));
+        double lambdaPriorDerivative = - diffAxDiff * expValue / (std::sqrt(2.0 * M_PI) * std::pow(anima::MCMGaussianPriorSigmaAxialDiffusivity, 3.0));
 
         m_PriorDerivativeVector[2] = betaPriorDerivative * priorLambda + priorBeta * lambdaPriorDerivative;
 
