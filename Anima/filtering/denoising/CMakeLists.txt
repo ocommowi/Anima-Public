@@ -1,2 +1,2 @@
-add_subdirectory(non_local_means_image_filter)
-add_subdirectory(non_local_means_temporal_image_filter)
+add_subdirectory(non_local_means)
+add_subdirectory(non_local_means_temporal)
