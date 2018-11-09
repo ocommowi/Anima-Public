@@ -89,19 +89,6 @@ TensorCompartment::ListType &TensorCompartment::GetPriorDerivativeVector()
 
         betaPriorDerivative = - numFAValue * betaPDFDerivative * sumLambdas * denomValue;
         m_PriorDerivativeVector[5] = betaPriorDerivative * priorLambda + priorBeta * lambdaPriorDerivative;
-
-        // And as usual handle bounded vs unbounded parameters
-        if (this->GetUseBoundedOptimization())
-        {
-            m_PriorDerivativeVector[3] *= levenberg::BoundedDerivativeAddOn(diffHighLambdas, this->GetBoundedSignVectorValue(3),
-                                                                            anima::MCMZeroLowerBound, anima::MCMDiffusivityUpperBound);
-
-            m_PriorDerivativeVector[4] *= levenberg::BoundedDerivativeAddOn(diffLowLambdas, this->GetBoundedSignVectorValue(4),
-                                                                            anima::MCMZeroLowerBound, anima::MCMDiffusivityUpperBound);
-
-            m_PriorDerivativeVector[5] *= levenberg::BoundedDerivativeAddOn(radialDiff2, this->GetBoundedSignVectorValue(5),
-                                                                            anima::MCMDiffusivityLowerBound, anima::MCMRadialDiffusivityUpperBound);
-        }
     }
 
     return m_PriorDerivativeVector;

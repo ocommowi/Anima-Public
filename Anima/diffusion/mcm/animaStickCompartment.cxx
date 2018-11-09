@@ -66,12 +66,6 @@ StickCompartment::ListType &StickCompartment::GetPriorDerivativeVector()
         double lambdaPriorDerivative = - diffAxDiff * expValue / (std::sqrt(2.0 * M_PI) * std::pow(anima::MCMGaussianPriorSigmaAxialDiffusivity, 3.0));
 
         m_PriorDerivativeVector[2] = betaPriorDerivative * priorLambda + priorBeta * lambdaPriorDerivative;
-
-        if (this->GetUseBoundedOptimization())
-        {
-            m_PriorDerivativeVector[2] *= levenberg::BoundedDerivativeAddOn(diffLambdas, this->GetBoundedSignVectorValue(2),
-                                                                            anima::MCMZeroLowerBound, anima::MCMDiffusivityUpperBound);
-        }
     }
 
     return m_PriorDerivativeVector;
