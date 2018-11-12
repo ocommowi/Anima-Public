@@ -108,7 +108,7 @@ GaussianMCMCost::GetDerivativeMatrix(const ParametersType &parameters, Derivativ
             for (unsigned int j = 0;j < nbParams;++j)
             {
                 derivative(j,i) *= priorValue;
-                derivative(j,i) -= (m_PredictedSignals[i] - m_ObservedSignals[i]) * priorDerivatives[j] * diffPriorValue / nbValues;
+                derivative(j,i) -= (m_ObservedSignals[i] - m_PredictedSignals[i]) * priorDerivatives[j] * diffPriorValue / nbValues;
             }
         }
     }
