@@ -47,7 +47,6 @@ protected:
     GaussianMCMCost()
     {
         m_MarginalEstimation = false;
-        m_UseDerivative = false;
     }
 
     virtual ~GaussianMCMCost() {}
