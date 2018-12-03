@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 {
     TCLAP::CmdLine cmd("INRIA / IRISA - VisAGeS Team", ' ',ANIMA_VERSION);
 
-    TCLAP::ValueArg<std::string> inArg("i","inputlist","Tensors image",true,"","input tensor image",cmd);
+    TCLAP::ValueArg<std::string> inArg("i","input","Input image",true,"","input image",cmd);
     TCLAP::ValueArg<std::string> resMeanArg("o","out-mean","Result local mean image",true,"","result local mean image",cmd);
     TCLAP::ValueArg<std::string> resVarArg("O","out-var","Result local variance image",true,"","result local variance image",cmd);
 
