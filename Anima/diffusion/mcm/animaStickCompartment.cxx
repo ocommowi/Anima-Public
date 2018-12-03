@@ -26,10 +26,10 @@ double StickCompartment::GetLogPriorValue()
 
     if (m_EstimateAxialDiffusivity)
     {
-        double faCompartment = this->GetFractionalAnisotropy();
+        double faCompartment = this->GetApparentFractionalAnisotropy();
         logPriorValue = anima::GetBetaLogPDF(faCompartment,anima::MCMPriorAlpha,anima::MCMPriorBeta);
 
-        double mdCompartment = this->GetMeanDiffusivity();
+        double mdCompartment = this->GetApparentMeanDiffusivity();
         logPriorValue += anima::GetGammaLogPDF(mdCompartment, anima::MCMGammaPriorKDiffusivity, anima::MCMGammaPriorThetaDiffusivity);
     }
 
@@ -61,8 +61,8 @@ StickCompartment::ListType &StickCompartment::GetPriorDerivativeVector()
             betaPriorDerivative = 1.0;
 
         // Multiply by Beta derivative of FA
-        double faValue = this->GetFractionalAnisotropy();
-        double mdValue = this->GetMeanDiffusivity();
+        double faValue = this->GetApparentFractionalAnisotropy();
+        double mdValue = this->GetApparentMeanDiffusivity();
         betaPriorDerivative *= anima::GetBetaPDFDerivative(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta);
 
         // Compute individual prior values

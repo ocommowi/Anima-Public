@@ -27,10 +27,10 @@ double ZeppelinCompartment::GetLogPriorValue()
 
     if (m_EstimateDiffusivities)
     {
-        double faCompartment = this->GetFractionalAnisotropy();
+        double faCompartment = this->GetApparentFractionalAnisotropy();
         logPriorValue = anima::GetBetaLogPDF(faCompartment,anima::MCMPriorAlpha,anima::MCMPriorBeta);
 
-        double mdCompartment = this->GetMeanDiffusivity();
+        double mdCompartment = this->GetApparentMeanDiffusivity();
         logPriorValue += anima::GetGammaLogPDF(mdCompartment, anima::MCMGammaPriorKDiffusivity, anima::MCMGammaPriorThetaDiffusivity);
     }
 
@@ -48,8 +48,8 @@ ZeppelinCompartment::ListType &ZeppelinCompartment::GetPriorDerivativeVector()
     if (m_EstimateDiffusivities)
     {
         // Compute individual prior values
-        double faValue = this->GetFractionalAnisotropy();
-        double mdValue = this->GetMeanDiffusivity();
+        double faValue = this->GetApparentFractionalAnisotropy();
+        double mdValue = this->GetApparentMeanDiffusivity();
 
         double priorBeta = std::exp(anima::GetBetaLogPDF(faValue,anima::MCMPriorAlpha,anima::MCMPriorBeta));
         double priorLambda = std::exp(anima::GetGammaLogPDF(mdValue,anima::MCMGammaPriorKDiffusivity,anima::MCMGammaPriorThetaDiffusivity));

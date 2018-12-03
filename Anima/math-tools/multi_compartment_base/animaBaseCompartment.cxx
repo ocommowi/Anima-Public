@@ -150,9 +150,4 @@ double BaseCompartment::GetApparentPerpendicularDiffusivity()
     throw itk::ExceptionObject(__FILE__,__LINE__,"This compartment type does not support apparent perpendicular diffusivity computation",ITK_LOCATION);
 }
 
-double BaseCompartment::GetMeanDiffusivity()
-{
-    throw itk::ExceptionObject(__FILE__,__LINE__,"This compartment type does not support mean diffusivity computation",ITK_LOCATION);
-}
-
 } // end namespace anima
