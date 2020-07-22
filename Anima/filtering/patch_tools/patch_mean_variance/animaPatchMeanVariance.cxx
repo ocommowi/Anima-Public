@@ -12,7 +12,7 @@ int main(int argc, char **argv)
     TCLAP::ValueArg<std::string> resVarArg("O","out-var","Result local variance image",true,"","result local variance image",cmd);
 
     TCLAP::ValueArg<unsigned int> neighArg("n","neigh-size","Neighborhood half size (default: 2)",false,2,"half size of local patch",cmd);
-    TCLAP::ValueArg<unsigned int> nbpArg("T","nb-threads","Number of threads (default: all cores)",false,itk::MultiThreader::GetGlobalDefaultNumberOfThreads(),"Number of threads",cmd);
+    TCLAP::ValueArg<unsigned int> nbpArg("T","nb-threads","Number of threads (default: all cores)",false,itk::MultiThreaderBase::GetGlobalDefaultNumberOfThreads(),"Number of threads",cmd);
 
     try
     {
@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 
     MainFilterType::Pointer mainFilter = MainFilterType::New();
 
-    mainFilter->SetNumberOfThreads(nbpArg.getValue());
+    mainFilter->SetNumberOfWorkUnits(nbpArg.getValue());
 
     ImageType::SizeType radius;
     for (unsigned int i = 0;i < 3;++i)
