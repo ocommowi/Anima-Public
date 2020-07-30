@@ -60,7 +60,7 @@ public:
     void SetModelVector(const itk::VariableLengthVector <float> &mcmVec);
     void SetModelVector(const ModelOutputVectorType &mcmVec);
 
-    //! Get log prior value for current model parameters
+    //! Get log prior value for current model parameters: log(P(theta))
     double GetLogPriorValue();
     //! Get log-derivatives of prior for current model parameters
     ListType &GetPriorDerivatives();

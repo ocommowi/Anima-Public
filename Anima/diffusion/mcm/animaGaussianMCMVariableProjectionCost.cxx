@@ -397,18 +397,17 @@ GaussianMCMVariableProjectionCost::GetDerivativeMatrix(const ParametersType &par
 
             derivative.put(i,k,derivativeVal);
         }
-        
-        if (m_MAPEstimationMode)
-        {
-            std::vector <double> priorDerivatives = m_MCMStructure->GetPriorDerivatives();
-            double diffPriorValue = std::exp(- m_LogPriorValue);
-            
-            for (unsigned int i = 0;i < nbValues;++i)
-            {
-                for (unsigned int j = 0;j < nbParams;++j)
-                    derivative(j,i) -= m_Residuals[i] * priorDerivatives[j] * diffPriorValue / nbValues;
-            }
+    }
 
+    if (m_MAPEstimationMode)
+    {
+        std::vector <double> priorDerivatives = m_MCMStructure->GetPriorDerivatives();
+        double diffPriorValue = std::exp(- m_LogPriorValue);
+
+        for (unsigned int i = 0;i < nbValues;++i)
+        {
+            for (unsigned int j = 0;j < nbParams;++j)
+                derivative(j,i) -= m_Residuals[i] * priorDerivatives[j] * diffPriorValue / nbValues;
         }
     }
 
@@ -443,6 +442,9 @@ GaussianMCMVariableProjectionCost::GetCurrentDerivative(DerivativeMatrixType &de
     // Current derivative of the system is 2 residual^T derivativeMatrix
     // To handle the fact that the cost function is -2 log(L) and not the rms problem itself
     derivative.set_size(nbParams);
+
+    // Has to be computed since even in MAP, sigma square is 1/n (y-Falpha)^2
+    // We thus miss P^-2/N
     double priorSquared = std::exp(- 2.0 * m_LogPriorValue /nbValues);
 
     for (unsigned int i = 0;i < nbParams;++i)
@@ -451,7 +453,8 @@ GaussianMCMVariableProjectionCost::GetCurrentDerivative(DerivativeMatrixType &de
         for (unsigned int j = 0;j < nbValues;++j)
             derivative[i] += m_Residuals[j] * derivativeMatrix.get(j,i);
 
-        derivative[i] *= 2.0 / (m_SigmaSquare * priorSquared);
+        // Derivative is 2N derivative / sigma^2
+        derivative[i] *= 2.0 * nbValues / (m_SigmaSquare * priorSquared);
     }
 }
 
