@@ -314,7 +314,7 @@ FuzzyCMeansFilter <ScalarType>
     m_ClassesMembership.resize(m_NbInputs);
     VectorType tmpVec(m_NbClass,0);
 
-    if (!m_SpectralClusterInit)
+    if (!m_SpectralInitialization)
     {
         for (unsigned int i = 0;i < m_NbClass;++i)
             m_Centroids[i] = m_InputData[i];

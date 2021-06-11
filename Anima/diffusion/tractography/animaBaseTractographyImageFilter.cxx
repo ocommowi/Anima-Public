@@ -238,7 +238,7 @@ void BaseTractographyImageFilter::ThreadedTrackComputer(unsigned int numThread, 
         if (!treatPoint)
             continue;
 
-        this->GetModelValue(curIndex,modelValue);
+        this->GetModelValue(curIndex, modelValue);
         if (isZero(modelValue))
             treatPoint = false;
 
@@ -356,7 +356,7 @@ BaseTractographyImageFilter::ComputeFiber(BaseTractographyImageFilter::FiberType
     VectorType modelValue;
     modelValue.SetSize(1);
 
-    this->GetModelValue(curIndex,modelValue);
+    this->GetModelValue(curIndex,oldDir,modelValue);
     // Go the forward way starting along initial direction provided
     while (continueLoop)
     {
@@ -400,7 +400,7 @@ BaseTractographyImageFilter::ComputeFiber(BaseTractographyImageFilter::FiberType
             continueLoop = false;
         else
         {
-            this->GetModelValue(curIndex,modelValue);
+            this->GetModelValue(curIndex,oldDir,modelValue);
 
             if (isZero(modelValue))
                 continueLoop = false;
@@ -431,7 +431,7 @@ BaseTractographyImageFilter::ComputeFiber(BaseTractographyImageFilter::FiberType
     m_SeedingImage->TransformPhysicalPointToIndex(curPoint,curNearestIndex);
 
     modelValue.SetSize(1);
-    this->GetModelValue(curIndex,modelValue);
+    this->GetModelValue(curIndex,oldDir,modelValue);
 
     // Now go the backwards way to complete the fiber
     while (continueLoop)
@@ -476,7 +476,7 @@ BaseTractographyImageFilter::ComputeFiber(BaseTractographyImageFilter::FiberType
             continueLoop = false;
         else
         {
-            this->GetModelValue(curIndex,modelValue);
+            this->GetModelValue(curIndex,oldDir,modelValue);
 
             if (isZero(modelValue))
                 continueLoop = false;
@@ -522,7 +522,7 @@ void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, Poin
         return;
     }
 
-    this->GetModelValue(curIndex,modelValue);
+    this->GetModelValue(curIndex,oldDir,modelValue);
     if (isZero(modelValue))
     {
         for (unsigned int i = 0;i < 3;++i)
@@ -544,7 +544,7 @@ void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, Poin
         return;
     }
 
-    this->GetModelValue(curIndex,modelValue);
+    this->GetModelValue(curIndex,oldDir,modelValue);
     if (isZero(modelValue))
     {
         for (unsigned int i = 0;i < 3;++i)
@@ -566,7 +566,7 @@ void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, Poin
         return;
     }
 
-    this->GetModelValue(curIndex,modelValue);
+    this->GetModelValue(curIndex,oldDir,modelValue);
     if (isZero(modelValue))
     {
         for (unsigned int i = 0;i < 3;++i)

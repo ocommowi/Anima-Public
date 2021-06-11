@@ -57,7 +57,7 @@ SpectralClusteringFilter <ScalarType>
     m_MainFilter.SetInputData(m_SpectralVectors);
     m_MainFilter.SetDataWeights(m_DataWeights);
     m_MainFilter.SetVerbose(m_Verbose);
-    m_MainFilter.SetFlagSpectralClustering(true);
+    m_MainFilter.SetSpectralInitialization(true);
     m_MainFilter.SetAverageType(m_CMeansAverageType);
 
     m_MainFilter.Update();

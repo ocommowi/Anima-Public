@@ -113,10 +113,12 @@ double
 GetZeroMeanGaussianSquaredDistance(const vnl_matrix<ScalarType> &sigma1, const vnl_matrix<ScalarType> &sigma2, const double neutralVariance)
 {
     unsigned int dimension = sigma1.rows();
-    
+
+    typename anima::LogEuclideanTensorCalculator <ScalarType>::Pointer leCalculator = anima::LogEuclideanTensorCalculator <double>::New();
+
     vnl_matrix<ScalarType> invSigma1, invSigma2;
-    anima::GetTensorPower(sigma1 / neutralVariance, invSigma1, -1.0);
-    anima::GetTensorPower(sigma2 / neutralVariance, invSigma2, -1.0);
+    leCalculator->GetTensorPower(sigma1 / neutralVariance, invSigma1, -1.0);
+    leCalculator->GetTensorPower(sigma2 / neutralVariance, invSigma2, -1.0);
     
     double firstTerm = 0;
     for (unsigned int i = 0;i < dimension;++i)
@@ -159,9 +161,11 @@ GetZeroMeanGaussianInnerProduct(const vnl_matrix<ScalarType> &sigma1, const vnl_
 {
     unsigned int dimension = sigma1.rows();
     
+    typename anima::LogEuclideanTensorCalculator <ScalarType>::Pointer leCalculator = anima::LogEuclideanTensorCalculator <double>::New();
+
     vnl_matrix<ScalarType> invSigma1, invSigma2;
-    anima::GetTensorPower(sigma1, invSigma1, -1.0);
-    anima::GetTensorPower(sigma2, invSigma2, -1.0);
+    leCalculator->GetTensorPower(sigma1, invSigma1, -1.0);
+    leCalculator->GetTensorPower(sigma2, invSigma2, -1.0);
     
     double firstTerm = 0, secondTerm = 0, thirdTerm = 0;
     for (unsigned int i = 0;i < dimension;++i)
@@ -182,9 +186,11 @@ GetZeroMeanGaussianSquaredCorrelation(const vnl_matrix<ScalarType> &sigma1, cons
 {
     unsigned int dimension = sigma1.rows();
     
+    typename anima::LogEuclideanTensorCalculator <ScalarType>::Pointer leCalculator = anima::LogEuclideanTensorCalculator <double>::New();
+
     vnl_matrix<ScalarType> invSigma1, invSigma2;
-    anima::GetTensorPower(sigma1, invSigma1, -1.0);
-    anima::GetTensorPower(sigma2, invSigma2, -1.0);
+    leCalculator->GetTensorPower(sigma1, invSigma1, -1.0);
+    leCalculator->GetTensorPower(sigma2, invSigma2, -1.0);
     
     double firstTerm = 0, secondTerm = 0, thirdTerm = 0;
     double firstTerm1 = 0, secondTerm1 = 0;

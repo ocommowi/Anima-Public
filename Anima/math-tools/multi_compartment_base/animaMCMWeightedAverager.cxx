@@ -142,7 +142,7 @@ void MCMWeightedAverager::Update()
                 m_InternalOutputWeights[i] += m_InputWeights[j] * tmpWeight;
 
                 workIsoMatrix = m_InputModels[j]->GetCompartment(i)->GetDiffusionTensor().GetVnlMatrix().as_matrix();
-                anima::GetTensorPower(workIsoMatrix,workIsoMatrix,-1.0);
+                m_leCalculator->GetTensorPower(workIsoMatrix,workIsoMatrix,-1.0);
                 workIsoMatrix = anima::GetZeroMeanGaussianScalarMultiplication(workIsoMatrix,1.0 / sumWeights,m_ReferenceSigma);
                 meanMatrix = anima::GetZeroMeanGaussianAddition(meanMatrix,workIsoMatrix,m_ReferenceSigma);
             }
@@ -265,7 +265,7 @@ void MCMWeightedAverager::ComputeTensorBayesDistanceMatrix()
     for (unsigned int i = 0;i < numCompartments;++i)
     {
         workMatrix = m_WorkCompartmentsVector[i]->GetDiffusionTensor().GetVnlMatrix().as_matrix();
-        anima::GetTensorPower(workMatrix,m_InternalInvertedTensors[i],-1.0);
+        m_leCalculator->GetTensorPower(workMatrix,m_InternalInvertedTensors[i],-1.0);
     }
 
     m_InternalDistanceMatrix.set_size(numCompartments,numCompartments);
@@ -396,7 +396,7 @@ void MCMWeightedAverager::ComputeOutputBayesTensorModel()
             meanMatrix = anima::GetZeroMeanGaussianAddition(meanMatrix,workMatrix,m_ReferenceSigma);
         }
 
-        anima::GetTensorPower(meanMatrix,meanMatrix,-1.0);
+        m_leCalculator->GetTensorPower(meanMatrix,meanMatrix,-1.0);
         anima::GetVectorRepresentation(meanMatrix,outputVector,6,false);
 
         m_InternalOutputWeights[i+numIsoCompartments] = totalWeights;
