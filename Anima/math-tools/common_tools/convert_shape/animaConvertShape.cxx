@@ -3,6 +3,8 @@
 #include <animaShapesReader.h>
 #include <animaShapesWriter.h>
 
+#include <vtkCleanPolyData.h>
+
 int main(int ac, const char** av)
 {
     TCLAP::CmdLine cmd("animaConverthape can be used to convert a VTK, VTP, CSV or FDS (medInria fiber format) file into another format. It does not check before writing fds "
@@ -34,8 +36,12 @@ int main(int ac, const char** av)
         return EXIT_FAILURE;
     }
 
+    vtkSmartPointer <vtkCleanPolyData> vtkCleaner = vtkSmartPointer <vtkCleanPolyData>::New();
+    vtkCleaner->SetInputData(shapesReader.GetOutput());
+    vtkCleaner->Update();
+
     anima::ShapesWriter shapesWriter;
-    shapesWriter.SetInputData(shapesReader.GetOutput());
+    shapesWriter.SetInputData(vtkCleaner->GetOutput());
     shapesWriter.SetFileName(outputArg.getValue());
 
     try
