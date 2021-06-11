@@ -69,7 +69,7 @@ void ComputeTangentsOnOneCell(vtkCell *cell, vtkSmartPointer <vtkDoubleArray> &l
         }
 
         tangentParameters->SetTuple3(ptId, tangent[0], tangent[1], tangent[2]);
-        lengthParameters->SetValue(ptId,norm);
+        lengthParameters->SetValue(ptId,length);
     }
 }
 
@@ -99,7 +99,6 @@ typedef struct
 {
     std::vector <double> *currentVector;
     std::vector <double> *currentOtherVector;
-    std::vector <double> *newVector;
     double epsilon, lambda;
     vtkSmartPointer <vtkPolyData> refTracks, movingTracks;
     vtkSmartPointer <vtkDoubleArray> refLengthParameters, movingLengthParameters;
@@ -140,7 +139,9 @@ void ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex,
 
     for (unsigned int i = startIndex;i < endIndex;++i)
     {
-        dataStr->newVector->operator[](i) = dataStr->lambda * dataStr->currentVector->operator[](i) + dataStr->epsilon * dataStr->lambda * std::log(dataStr->refLengthParameters->GetValue(i));
+        double weightValue = dataStr->refLengthParameters->GetValue(i);
+        dataStr->currentVector->operator[](i) = dataStr->lambda * std::log(weightValue);
+
         double uPosition[3];
         double uTangent[3];
         double vPosition[3];
@@ -154,10 +155,10 @@ void ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex,
             dataStr->movingTracks->GetPoints()->GetPoint(j,vPosition);
             dataStr->movingTangentParameters->GetTuple(j,vTangent);
 
-            tmpVector[j] = (dataStr->currentVector->operator[](i) + dataStr->currentOtherVector->operator[](j) - ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0)) / dataStr->epsilon;
+            tmpVector[j] = dataStr->currentOtherVector->operator[](j) - ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0) / dataStr->epsilon;
         }
 
-        dataStr->newVector->operator[](i) -= dataStr->epsilon * dataStr->lambda * anima::ExponentialSum(tmpVector);
+        dataStr->currentVector->operator[](i) -= dataStr->lambda * anima::ExponentialSum(tmpVector);
     }
 }
 
@@ -192,8 +193,9 @@ int main(int argc, char **argv)
     TCLAP::ValueArg <unsigned int> precisionArg("p","precision","Precision of values output (integer, default: 6)",false,6,"precision",cmd);
     TCLAP::ValueArg <unsigned int> nbThreadsArg("T","nb-threads","Number of threads to run on (default: all available)",false,itk::MultiThreaderBase::GetGlobalDefaultNumberOfThreads(),"number of threads",cmd);
 
-    TCLAP::ValueArg <double> rhoArg("R","rho","Rho value in unbalanced optimal transport (default: )",false,0.25,"number of threads",cmd);
-    TCLAP::ValueArg <double> epsilonArg("E","epsilon","Epsilon value in unbalanced optimal transport (default: )",false,2.25e-4,"number of threads",cmd);
+    TCLAP::ValueArg <double> rhoArg("R","rho","Rho value in unbalanced optimal transport (default: 1.0)",false,1.0,"number of threads",cmd);
+    TCLAP::ValueArg <double> epsilonArg("E","epsilon","Epsilon value in unbalanced optimal transport (default: sqrt(0.07))",false,std::sqrt(0.07),"number of threads",cmd);
+    TCLAP::ValueArg <double> stopThrArg("s","stop-thr","Relative threshold to stop iterations (default: 1.0e-4)",false,1.0e-4,"relative stop threshold",cmd);
 
     try
     {
@@ -213,6 +215,10 @@ int main(int argc, char **argv)
     using PolyDataPointer = vtkSmartPointer <vtkPolyData>;
     PolyDataPointer refDataTracks = trackReader.GetOutput();
 
+    // Get dummy cell so that it's thread safe
+    vtkSmartPointer <vtkGenericCell> dummyCell = vtkGenericCell::New();
+    refDataTracks->GetCell(0,dummyCell);
+
     vtkIdType nbTotalPtsRef = refDataTracks->GetNumberOfPoints();
     if (nbTotalPtsRef == 0)
     {
@@ -221,7 +227,7 @@ int main(int argc, char **argv)
     }
 
     // Get dummy cell so that it's thread safe
-    vtkSmartPointer <vtkGenericCell> dummyCell = vtkGenericCell::New();
+    dummyCell = vtkGenericCell::New();
     refDataTracks->GetCell(0,dummyCell);
 
     vtkSmartPointer <vtkDoubleArray> refTangents = vtkDoubleArray::New();
@@ -252,6 +258,8 @@ int main(int argc, char **argv)
     trackReader.Update();
 
     PolyDataPointer movingDataTracks = trackReader.GetOutput();
+    dummyCell = vtkGenericCell::New();
+    movingDataTracks->GetCell(0,dummyCell);
 
     vtkIdType nbTotalPtsMoving = movingDataTracks->GetNumberOfPoints();
     if (nbTotalPtsMoving == 0)
@@ -283,18 +291,27 @@ int main(int argc, char **argv)
     movingDataTracks->GetPointData()->AddArray(movingLengths);
     movingDataTracks->GetPointData()->AddArray(movingTangents);
 
+    std::cout << "Number of fibers: ref: " << refDataTracks->GetNumberOfCells() << ", moving: " << movingDataTracks->GetNumberOfCells() << std::endl;
+    std::cout << "Number of points: ref: " << nbTotalPtsRef << ", moving: " << nbTotalPtsMoving << std::endl;
+
     // Now go on with the Sinkhorn algorithm
     std::vector <double> uVector(nbTotalPtsRef, 0.0), vVector(nbTotalPtsMoving, 0.0);
-    std::vector <double> newUVector(nbTotalPtsRef, 0.0), newVVector(nbTotalPtsMoving, 0.0);
+    std::vector <double> oldUVector(nbTotalPtsRef, 0.0), oldVVector(nbTotalPtsMoving, 0.0);
 
     double rho = rhoArg.getValue();
     double epsilon = epsilonArg.getValue();
     double lambda = rho / (rho + epsilon);
+    double maxDiff = stopThrArg.getValue() + 1.0;
 
-    for (unsigned int a = 0;a < 5000;++a)
+    itk::TimeProbe tmpTime;
+    tmpTime.Start();
+
+    unsigned int numIterations = 0;
+    while (maxDiff > stopThrArg.getValue())
     {
-        itk::TimeProbe tmpTime;
-        tmpTime.Start();
+        ++numIterations;
+        oldUVector = uVector;
+        oldVVector = vVector;
 
         VectorUpdateThreaderArguments uVecUpdateStr;
         uVecUpdateStr.refTracks = refDataTracks;
@@ -305,7 +322,6 @@ int main(int argc, char **argv)
         uVecUpdateStr.movingTangentParameters = movingTangents;
         uVecUpdateStr.currentVector = &uVector;
         uVecUpdateStr.currentOtherVector = &vVector;
-        uVecUpdateStr.newVector = &newUVector;
         uVecUpdateStr.epsilon = epsilon;
         uVecUpdateStr.lambda = lambda;
 
@@ -321,37 +337,79 @@ int main(int argc, char **argv)
         vVecUpdateStr.movingTangentParameters = refTangents;
         vVecUpdateStr.currentVector = &vVector;
         vVecUpdateStr.currentOtherVector = &uVector;
-        vVecUpdateStr.newVector = &newVVector;
         vVecUpdateStr.epsilon = epsilon;
         vVecUpdateStr.lambda = lambda;
 
         mThreader->SetSingleMethod(ThreadVectorUpdate,&vVecUpdateStr);
         mThreader->SingleMethodExecute();
 
-        tmpTime.Stop();
-
-        double maxDiff = 0.0;
+        maxDiff = 0.0;
         for (unsigned int i = 0;i < nbTotalPtsRef;++i)
         {
-            double diffVal = std::abs(newUVector[i] - uVector[i]) / std::max(std::abs(newUVector[i]),std::abs(uVector[i]));
+            double diffVal = std::abs(oldUVector[i] - uVector[i]) / std::max(std::abs(oldUVector[i]),std::abs(uVector[i]));
             if (diffVal > maxDiff)
                 maxDiff = diffVal;
-
-            uVector[i] = newUVector[i];
         }
 
         for (unsigned int i = 0;i < nbTotalPtsMoving;++i)
         {
-            double diffVal = std::abs(newVVector[i] - vVector[i]) / std::max(std::abs(newVVector[i]),std::abs(vVector[i]));
+            double diffVal = std::abs(oldVVector[i] - vVector[i]) / std::max(std::abs(oldVVector[i]),std::abs(vVector[i]));
             if (diffVal > maxDiff)
                 maxDiff = diffVal;
-
-            vVector[i] = newVVector[i];
         }
-
-        std::cout << "Stop criterion: " << maxDiff << std::endl;
-        std::cout << "Iteration " << a+1 << " in " << tmpTime.GetTotal() << std::endl;
     }
+
+    tmpTime.Stop();
+    std::cout << "Number of iterations: " << numIterations << ". Computation time: " << tmpTime.GetTotal() << "s..." << std::endl;
+
+    double distanceValue = 0.0;
+    std::vector <double> distKLUVector(nbTotalPtsRef, 0.0);
+    std::vector <double> distKLVVector(nbTotalPtsMoving, 0.0);
+    for (unsigned int i = 0;i < nbTotalPtsRef;++i)
+    {
+        double uPosition[3];
+        double uTangent[3];
+        double vPosition[3];
+        double vTangent[3];
+
+        refDataTracks->GetPoints()->GetPoint(i,uPosition);
+        refTangents->GetTuple(i,uTangent);
+
+        for (unsigned int j = 0;j < nbTotalPtsMoving;++j)
+        {
+            movingDataTracks->GetPoints()->GetPoint(j,vPosition);
+            movingTangents->GetTuple(j,vTangent);
+
+            double ijDistance = ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0);
+            double Pij = std::exp(uVector[i] + vVector[j] - ijDistance / epsilon);
+            distanceValue += Pij * ijDistance;
+            distKLUVector[i] += Pij;
+            distKLVVector[j] += Pij;
+        }
+    }
+
+    for (unsigned int i = 0;i < nbTotalPtsRef;++i)
+    {
+        double aValue = refLengths->GetValue(i);
+        double xlnx = 0.0;
+        if (distKLUVector[i] > 0)
+            xlnx = distKLUVector[i] * std::log(distKLUVector[i] / aValue);
+
+        distanceValue += rho * (xlnx - distKLUVector[i] + aValue);
+    }
+
+    for (unsigned int i = 0;i < nbTotalPtsMoving;++i)
+    {
+        double bValue = movingLengths->GetValue(i);
+        double xlnx = 0.0;
+        if (distKLVVector[i] > 0)
+            xlnx = distKLVVector[i] * std::log(distKLVVector[i] / bValue);
+
+        distanceValue += rho * (xlnx - distKLVVector[i] + bValue);
+    }
+
+    std::cout.precision(precisionArg.getValue());
+    std::cout << "Squared Wasserstein distance: " << distanceValue << std::endl;
 
     return EXIT_SUCCESS;
 }
