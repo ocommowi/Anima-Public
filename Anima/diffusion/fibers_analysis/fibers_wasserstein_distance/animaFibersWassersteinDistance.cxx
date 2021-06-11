@@ -103,7 +103,18 @@ typedef struct
     vtkSmartPointer <vtkPolyData> refTracks, movingTracks;
     vtkSmartPointer <vtkDoubleArray> refLengthParameters, movingLengthParameters;
     vtkSmartPointer <vtkDoubleArray> refTangentParameters, movingTangentParameters;
+
+    vnl_matrix <double> *distanceMatrix;
+    bool useDistanceMatrix;
+    bool transposeDistanceMatrix;
 } VectorUpdateThreaderArguments;
+
+typedef struct
+{
+    vtkSmartPointer <vtkPolyData> refTracks, movingTracks;
+    vtkSmartPointer <vtkDoubleArray> refTangentParameters, movingTangentParameters;
+    vnl_matrix <double> *distanceMatrix;
+} DistanceMatrixComputationThreaderArguments;
 
 ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadTangent(void *arg)
 {
@@ -137,16 +148,59 @@ void ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex,
     unsigned int nbTotalPtsMoving = dataStr->movingTracks->GetNumberOfPoints();
     std::vector <double> tmpVector(nbTotalPtsMoving, 0.0);
 
+    double uPosition[3];
+    double uTangent[3];
+    double vPosition[3];
+    double vTangent[3];
+
+    bool useDistMatrix = dataStr->useDistanceMatrix;
+    bool transposeDistMatrix = dataStr->transposeDistanceMatrix;
+
     for (unsigned int i = startIndex;i < endIndex;++i)
     {
         double weightValue = dataStr->refLengthParameters->GetValue(i);
         dataStr->currentVector->operator[](i) = dataStr->lambda * std::log(weightValue);
 
-        double uPosition[3];
-        double uTangent[3];
-        double vPosition[3];
-        double vTangent[3];
+        dataStr->refTracks->GetPoints()->GetPoint(i,uPosition);
+        dataStr->refTangentParameters->GetTuple(i,uTangent);
 
+        for (unsigned int j = 0;j < nbTotalPtsMoving;++j)
+        {
+            double distance = 0.0;
+            if (useDistMatrix)
+            {
+                if (!transposeDistMatrix)
+                    distance = dataStr->distanceMatrix->operator()(i,j);
+                else
+                    distance = dataStr->distanceMatrix->operator()(j,i);
+            }
+            else
+            {
+                dataStr->movingTracks->GetPoints()->GetPoint(j,vPosition);
+                dataStr->movingTangentParameters->GetTuple(j,vTangent);
+
+                distance = ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0);
+            }
+
+            tmpVector[j] = dataStr->currentOtherVector->operator[](j) - distance / dataStr->epsilon;
+        }
+
+        dataStr->currentVector->operator[](i) -= dataStr->lambda * anima::ExponentialSum(tmpVector);
+    }
+}
+
+void ComputeDistanceMatrixElementsOnRange(unsigned int startIndex, unsigned int endIndex,
+                                          DistanceMatrixComputationThreaderArguments *dataStr)
+{
+    unsigned int nbTotalPtsMoving = dataStr->movingTracks->GetNumberOfPoints();
+
+    double uPosition[3];
+    double uTangent[3];
+    double vPosition[3];
+    double vTangent[3];
+
+    for (unsigned int i = startIndex;i < endIndex;++i)
+    {
         dataStr->refTracks->GetPoints()->GetPoint(i,uPosition);
         dataStr->refTangentParameters->GetTuple(i,uTangent);
 
@@ -155,12 +209,11 @@ void ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex,
             dataStr->movingTracks->GetPoints()->GetPoint(j,vPosition);
             dataStr->movingTangentParameters->GetTuple(j,vTangent);
 
-            tmpVector[j] = dataStr->currentOtherVector->operator[](j) - ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0) / dataStr->epsilon;
+            dataStr->distanceMatrix->put(i,j,ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0));
         }
-
-        dataStr->currentVector->operator[](i) -= dataStr->lambda * anima::ExponentialSum(tmpVector);
     }
 }
+
 
 ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadVectorUpdate(void *arg)
 {
@@ -183,6 +236,27 @@ ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadVectorUpdate(void *arg)
     return ITK_THREAD_RETURN_DEFAULT_VALUE;
 }
 
+ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadPrecomputeDistanceMatrix(void *arg)
+{
+    itk::MultiThreaderBase::WorkUnitInfo *threadArgs = (itk::MultiThreaderBase::WorkUnitInfo *)arg;
+    unsigned int nbThread = threadArgs->WorkUnitID;
+    unsigned int numTotalThread = threadArgs->NumberOfWorkUnits;
+
+    DistanceMatrixComputationThreaderArguments *tmpArg = (DistanceMatrixComputationThreaderArguments *)threadArgs->UserData;
+    unsigned int nbTotalPts = tmpArg->refTracks->GetNumberOfPoints();
+
+    unsigned int step = nbTotalPts / numTotalThread;
+    unsigned int startIndex = nbThread * step;
+    unsigned int endIndex = (nbThread + 1) * step;
+
+    if (nbThread == numTotalThread - 1)
+        endIndex = nbTotalPts;
+
+    ComputeDistanceMatrixElementsOnRange(startIndex, endIndex, tmpArg);
+
+    return ITK_THREAD_RETURN_DEFAULT_VALUE;
+}
+
 int main(int argc, char **argv)
 {
     TCLAP::CmdLine cmd("INRIA / IRISA - VisAGeS/Empenn Team", ' ',ANIMA_VERSION);
@@ -195,7 +269,9 @@ int main(int argc, char **argv)
 
     TCLAP::ValueArg <double> rhoArg("R","rho","Rho value in unbalanced optimal transport (default: 1.0)",false,1.0,"number of threads",cmd);
     TCLAP::ValueArg <double> epsilonArg("E","epsilon","Epsilon value in unbalanced optimal transport (default: sqrt(0.07))",false,std::sqrt(0.07),"number of threads",cmd);
+
     TCLAP::ValueArg <double> stopThrArg("s","stop-thr","Relative threshold to stop iterations (default: 1.0e-4)",false,1.0e-4,"relative stop threshold",cmd);
+    TCLAP::ValueArg <double> memoryLimitArg("M","mem-lim","Memory limit to precompute distance matrix (in Gb, default: 8)",false,8.0,"memory limit",cmd);
 
     try
     {
@@ -294,6 +370,26 @@ int main(int argc, char **argv)
     std::cout << "Number of fibers: ref: " << refDataTracks->GetNumberOfCells() << ", moving: " << movingDataTracks->GetNumberOfCells() << std::endl;
     std::cout << "Number of points: ref: " << nbTotalPtsRef << ", moving: " << nbTotalPtsMoving << std::endl;
 
+    double dataSize = nbTotalPtsRef * nbTotalPtsMoving * sizeof(double) / std::pow(1024.0,3);
+    std::cout << "Required memory to precompute distance matrix: " << dataSize << " Gb" << std::endl;
+    bool precomputeDistanceMatrix = (dataSize < memoryLimitArg.getValue());
+    std::cout << "Precomputing? " << precomputeDistanceMatrix << std::endl;
+
+    vnl_matrix <double> distanceMatrix;
+    if (precomputeDistanceMatrix)
+    {
+        distanceMatrix.set_size(nbTotalPtsRef, nbTotalPtsMoving);
+        DistanceMatrixComputationThreaderArguments distStr;
+        distStr.refTracks = refDataTracks;
+        distStr.movingTracks = movingDataTracks;
+        distStr.refTangentParameters = refTangents;
+        distStr.movingTangentParameters = movingTangents;
+        distStr.distanceMatrix = &distanceMatrix;
+
+        mThreader->SetSingleMethod(ThreadPrecomputeDistanceMatrix,&distStr);
+        mThreader->SingleMethodExecute();
+    }
+
     // Now go on with the Sinkhorn algorithm
     std::vector <double> uVector(nbTotalPtsRef, 0.0), vVector(nbTotalPtsMoving, 0.0);
     std::vector <double> oldUVector(nbTotalPtsRef, 0.0), oldVVector(nbTotalPtsMoving, 0.0);
@@ -310,6 +406,7 @@ int main(int argc, char **argv)
     while (maxDiff > stopThrArg.getValue())
     {
         ++numIterations;
+
         oldUVector = uVector;
         oldVVector = vVector;
 
@@ -324,6 +421,9 @@ int main(int argc, char **argv)
         uVecUpdateStr.currentOtherVector = &vVector;
         uVecUpdateStr.epsilon = epsilon;
         uVecUpdateStr.lambda = lambda;
+        uVecUpdateStr.distanceMatrix = &distanceMatrix;
+        uVecUpdateStr.useDistanceMatrix = precomputeDistanceMatrix;
+        uVecUpdateStr.transposeDistanceMatrix = false;
 
         mThreader->SetSingleMethod(ThreadVectorUpdate,&uVecUpdateStr);
         mThreader->SingleMethodExecute();
@@ -339,6 +439,9 @@ int main(int argc, char **argv)
         vVecUpdateStr.currentOtherVector = &uVector;
         vVecUpdateStr.epsilon = epsilon;
         vVecUpdateStr.lambda = lambda;
+        vVecUpdateStr.distanceMatrix = &distanceMatrix;
+        vVecUpdateStr.useDistanceMatrix = precomputeDistanceMatrix;
+        vVecUpdateStr.transposeDistanceMatrix = true;
 
         mThreader->SetSingleMethod(ThreadVectorUpdate,&vVecUpdateStr);
         mThreader->SingleMethodExecute();
@@ -380,7 +483,12 @@ int main(int argc, char **argv)
             movingDataTracks->GetPoints()->GetPoint(j,vPosition);
             movingTangents->GetTuple(j,vTangent);
 
-            double ijDistance = ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0);
+            double ijDistance = 0.0;
+            if (precomputeDistanceMatrix)
+                ijDistance = distanceMatrix(i,j);
+            else
+                ijDistance = ComputePointDistance(uPosition,uTangent,vPosition,vTangent,1.0,4.0);
+
             double Pij = std::exp(uVector[i] + vVector[j] - ijDistance / epsilon);
             distanceValue += Pij * ijDistance;
             distKLUVector[i] += Pij;
