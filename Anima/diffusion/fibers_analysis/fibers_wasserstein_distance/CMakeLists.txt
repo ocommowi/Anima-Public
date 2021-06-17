@@ -27,6 +27,7 @@ add_executable(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
   AnimaDataIO
+  AnimaFibersAnalysis
   ${VTK_PREFIX}CommonCore
   ${VTK_PREFIX}CommonDataModel
   )
