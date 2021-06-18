@@ -80,9 +80,6 @@ int main(int argc, char **argv)
     // Get dummy cell so that it's thread safe
     movingDataTracks->GetCell(0,dummyCell);
 
-    std::cout << "Number of fibers: ref: " << refDataTracks->GetNumberOfCells() << ", moving: " << movingDataTracks->GetNumberOfCells() << std::endl;
-    std::cout << "Number of points: ref: " << nbTotalPtsRef << ", moving: " << nbTotalPtsMoving << std::endl;
-
     double distanceValue = 0;
     if (distTypeArg.getValue() == 0) // pointwise distance
     {
@@ -96,7 +93,7 @@ int main(int argc, char **argv)
         uotFilter->SetMemorySizeLimit(memoryLimitArg.getValue());
         uotFilter->SetRelativeStopCriterion(stopThrArg.getValue());
         uotFilter->SetNumberOfWorkUnits(nbThreadsArg.getValue());
-        uotFilter->SetVerbose(false);
+        uotFilter->SetVerbose(true);
 
         uotFilter->Update();
         distanceValue = uotFilter->GetWassersteinSquaredDistance();

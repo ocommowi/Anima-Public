@@ -61,17 +61,22 @@ FiberBundleUnbalancedOptimalTransport
 
     if (m_Verbose)
         std::cout << "Required memory to precompute distance matrix: " << dataSize << " Gb" << std::endl;
+
     bool precomputeDistanceMatrix = (dataSize < m_MemorySizeLimit);
 
     if (m_Verbose)
-        std::cout << "Precomputing? " << precomputeDistanceMatrix << std::endl;
+        std::cout << "Precomputing? " << (precomputeDistanceMatrix ? "Yes" : "No") << std::endl;
 
     if (precomputeDistanceMatrix)
-       this->PrecomputeDistanceMatrix();
+    {
+        this->PrecomputeDistanceMatrix();
+
+        if (m_Verbose)
+            std::cout << "Distance matrix precomputed" << std::endl;
+    }
     else
         m_DistanceMatrix.set_size(0,0);
 
-    std::cout << "Distance matrix precomputed" << std::endl;
     // Now go on with the Sinkhorn algorithm
     m_UVector.resize(nbCellsFirst);
     m_VVector.resize(nbCellsSecond);
@@ -182,8 +187,10 @@ FiberBundleUnbalancedOptimalTransport
     if (nbThread == numTotalThread - 1)
         endIndex = nbTotalCellsFirst;
 
+    vtkGenericCell *cellData = vtkGenericCell::New();
+
     for (unsigned int i = startIndex;i < endIndex;++i)
-        tmpArg->uotPtr->ComputeExtraDataOnCell(i,0);
+        tmpArg->uotPtr->ComputeExtraDataOnCell(i,cellData,0);
 
     step = nbTotalCellsSecond / numTotalThread;
     startIndex = nbThread * step;
@@ -193,16 +200,15 @@ FiberBundleUnbalancedOptimalTransport
         endIndex = nbTotalCellsSecond;
 
     for (unsigned int i = startIndex;i < endIndex;++i)
-        tmpArg->uotPtr->ComputeExtraDataOnCell(i,1);
+        tmpArg->uotPtr->ComputeExtraDataOnCell(i,cellData,1);
 
     return ITK_THREAD_RETURN_DEFAULT_VALUE;
 }
 
 void
 FiberBundleUnbalancedOptimalTransport
-::ComputeExtraDataOnCell(unsigned int cellIndex, unsigned int dataIndex)
+::ComputeExtraDataOnCell(unsigned int cellIndex, vtkGenericCell *cellData, unsigned int dataIndex)
 {
-    vtkGenericCell *cellData = vtkGenericCell::New();
     if (dataIndex == 0)
         m_FirstDataset->GetCell(cellIndex, cellData);
     else

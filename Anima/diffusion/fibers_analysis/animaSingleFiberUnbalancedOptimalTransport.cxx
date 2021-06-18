@@ -21,6 +21,9 @@ SingleFiberUnbalancedOptimalTransport::SingleFiberUnbalancedOptimalTransport()
     m_KValue = 4.0;
 
     m_Verbose = true;
+
+    m_FirstDatasetCell = vtkGenericCell::New();
+    m_SecondDatasetCell = vtkGenericCell::New();
 }
 
 void
@@ -32,13 +35,11 @@ SingleFiberUnbalancedOptimalTransport
 
     this->PrepareInputFibersData();
 
-    vtkSmartPointer <vtkGenericCell> firstCell = vtkGenericCell::New();
-    m_FirstDataset->GetCell(m_FiberIndexInFirstDataset, firstCell);
-    vtkSmartPointer <vtkGenericCell> secondCell = vtkGenericCell::New();
-    m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, secondCell);
+    m_FirstDataset->GetCell(m_FiberIndexInFirstDataset, m_FirstDatasetCell);
+    m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, m_SecondDatasetCell);
 
-    unsigned int nbPointsFirst = firstCell->GetNumberOfPoints();
-    unsigned int nbPointsSecond = secondCell->GetNumberOfPoints();
+    unsigned int nbPointsFirst = m_FirstDatasetCell->GetNumberOfPoints();
+    unsigned int nbPointsSecond = m_SecondDatasetCell->GetNumberOfPoints();
 
     if (m_Verbose)
         std::cout << "Number of points in fiber cell: ref: " << nbPointsFirst << ", moving: " << nbPointsSecond << std::endl;
@@ -47,13 +48,19 @@ SingleFiberUnbalancedOptimalTransport
 
     if (m_Verbose)
         std::cout << "Required memory to precompute distance matrix: " << dataSize << " Gb" << std::endl;
+
     bool precomputeDistanceMatrix = (dataSize < m_MemorySizeLimit);
 
     if (m_Verbose)
-        std::cout << "Precomputing? " << precomputeDistanceMatrix << std::endl;
+        std::cout << "Precomputing? " << (precomputeDistanceMatrix ? "Yes" : "No") << std::endl;
 
     if (precomputeDistanceMatrix)
-       this->PrecomputeDistanceMatrix();
+    {
+        this->PrecomputeDistanceMatrix();
+
+        if (m_Verbose)
+            std::cout << "Distance matrix precomputed" << std::endl;
+    }
     else
         m_DistanceMatrix.set_size(0,0);
 
@@ -264,13 +271,8 @@ void
 SingleFiberUnbalancedOptimalTransport
 ::PrecomputeDistanceMatrix()
 {
-    vtkSmartPointer <vtkGenericCell> firstCell = vtkGenericCell::New();
-    m_FirstDataset->GetCell(m_FiberIndexInFirstDataset, firstCell);
-    vtkSmartPointer <vtkGenericCell> secondCell = vtkGenericCell::New();
-    m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, secondCell);
-
-    unsigned int nbPointsFirst = firstCell->GetNumberOfPoints();
-    unsigned int nbPointsSecond = secondCell->GetNumberOfPoints();
+    unsigned int nbPointsFirst = m_FirstDatasetCell->GetNumberOfPoints();
+    unsigned int nbPointsSecond = m_SecondDatasetCell->GetNumberOfPoints();
 
     m_DistanceMatrix.set_size(nbPointsFirst, nbPointsSecond);
 
@@ -290,9 +292,7 @@ SingleFiberUnbalancedOptimalTransport
     unsigned int numTotalThread = threadArgs->NumberOfWorkUnits;
 
     ThreadArguments *tmpArg = (ThreadArguments *)threadArgs->UserData;
-    vtkSmartPointer <vtkGenericCell> tmpCell = vtkGenericCell::New();
-    tmpArg->uotPtr->GetFirstDataset()->GetCell(tmpArg->uotPtr->GetFiberIndexInFirstDataset(), tmpCell);
-    unsigned int nbTotalPointsFirst = tmpCell->GetNumberOfPoints();
+    unsigned int nbTotalPointsFirst = tmpArg->uotPtr->GetFirstDatasetCell()->GetNumberOfPoints();
 
     unsigned int step = nbTotalPointsFirst / numTotalThread;
     unsigned int startIndex = nbThread * step;
@@ -310,9 +310,7 @@ void
 SingleFiberUnbalancedOptimalTransport
 ::PrecomputeDistancesOnRange(unsigned int startIndex, unsigned int endIndex)
 {
-    vtkSmartPointer <vtkGenericCell> tmpCell = vtkGenericCell::New();
-    m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, tmpCell);
-    unsigned int nbPointsSecond = tmpCell->GetNumberOfPoints();
+    unsigned int nbPointsSecond = m_SecondDatasetCell->GetNumberOfPoints();
 
     for (unsigned int i = startIndex;i < endIndex;++i)
     {
@@ -325,13 +323,8 @@ double
 SingleFiberUnbalancedOptimalTransport
 ::ComputeDistance(unsigned int firstIndex, unsigned int secondIndex)
 {
-    vtkSmartPointer <vtkGenericCell> firstCell = vtkGenericCell::New();
-    m_FirstDataset->GetCell(m_FiberIndexInFirstDataset, firstCell);
-    vtkIdType firstId = firstCell->GetPointIds()->GetId(firstIndex);
-
-    vtkSmartPointer <vtkGenericCell> secondCell = vtkGenericCell::New();
-    m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, secondCell);
-    vtkIdType secondId = secondCell->GetPointIds()->GetId(secondIndex);
+    vtkIdType firstId = m_FirstDatasetCell->GetPointIds()->GetId(firstIndex);
+    vtkIdType secondId = m_SecondDatasetCell->GetPointIds()->GetId(secondIndex);
 
     double distance = 0.0;
     double tangentDistance = 0.0;
@@ -341,9 +334,9 @@ SingleFiberUnbalancedOptimalTransport
     double firstTangent[3];
     double secondTangent[3];
 
-    firstCell->GetPoints()->GetPoint(firstIndex, firstPointPosition);
+    m_FirstDatasetCell->GetPoints()->GetPoint(firstIndex, firstPointPosition);
     m_SegmentTangentsFirstDataset->GetTuple(firstId, firstTangent);
-    secondCell->GetPoints()->GetPoint(secondIndex, secondPointPosition);
+    m_SecondDatasetCell->GetPoints()->GetPoint(secondIndex, secondPointPosition);
     m_SegmentTangentsSecondDataset->GetTuple(secondId, secondTangent);
 
     for (unsigned int i = 0;i < 3;++i)
@@ -366,17 +359,10 @@ SingleFiberUnbalancedOptimalTransport
     ThreadArguments *tmpArg = (ThreadArguments *)threadArgs->UserData;
     unsigned int nbPoints = 0;
 
-    vtkSmartPointer <vtkGenericCell> tmpCell = vtkGenericCell::New();
     if (tmpArg->uotPtr->GetUpdateUVector())
-    {
-        tmpArg->uotPtr->GetFirstDataset()->GetCell(tmpArg->uotPtr->GetFiberIndexInFirstDataset(), tmpCell);
-        nbPoints = tmpCell->GetNumberOfPoints();
-    }
+        nbPoints = tmpArg->uotPtr->GetFirstDatasetCell()->GetNumberOfPoints();
     else
-    {
-        tmpArg->uotPtr->GetSecondDataset()->GetCell(tmpArg->uotPtr->GetFiberIndexInSecondDataset(), tmpCell);
-        nbPoints = tmpCell->GetNumberOfPoints();
-    }
+        nbPoints = tmpArg->uotPtr->GetSecondDatasetCell()->GetNumberOfPoints();
 
     unsigned int step = nbPoints / numTotalThread;
     unsigned int startIndex = nbThread * step;
@@ -400,25 +386,19 @@ SingleFiberUnbalancedOptimalTransport
     std::vector <double> *updatedVector = &m_UVector;
     std::vector <double> *fixedVector = &m_VVector;
 
-    vtkSmartPointer <vtkGenericCell> firstCell = vtkGenericCell::New();
-    vtkSmartPointer <vtkGenericCell> secondCell = vtkGenericCell::New();
-
     if (m_UpdateUVector)
     {
-        m_FirstDataset->GetCell(m_FiberIndexInFirstDataset, firstCell);
-        m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, secondCell);
+        nbPoints = m_FirstDatasetCell->GetNumberOfPoints();
+        nbOtherPoints = m_SecondDatasetCell->GetNumberOfPoints();
     }
     else
     {
-        m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, firstCell);
-        m_FirstDataset->GetCell(m_FiberIndexInFirstDataset, secondCell);
+        nbPoints = m_SecondDatasetCell->GetNumberOfPoints();
+        nbOtherPoints = m_FirstDatasetCell->GetNumberOfPoints();
 
         updatedVector = &m_VVector;
         fixedVector = &m_UVector;
     }
-
-    nbPoints = firstCell->GetNumberOfPoints();
-    nbOtherPoints = secondCell->GetNumberOfPoints();
 
     std::vector <double> tmpVector(nbOtherPoints, 0.0);
 
@@ -429,11 +409,17 @@ SingleFiberUnbalancedOptimalTransport
     for (unsigned int i = startIndex;i < endIndex;++i)
     {
         double weightValue = 1.0;
-        vtkIdType tmpId = firstCell->GetPointId(i);
+        vtkIdType tmpId;
         if (m_UpdateUVector)
+        {
+            tmpId = m_FirstDatasetCell->GetPointId(i);
             weightValue = m_SegmentLengthsFirstDataset->GetValue(tmpId);
+        }
         else
+        {
+            tmpId = m_SecondDatasetCell->GetPointId(i);
             weightValue = m_SegmentLengthsSecondDataset->GetValue(tmpId);
+        }
 
         updatedVector->operator[](i) = lambda * std::log(weightValue);
 
@@ -466,14 +452,8 @@ void
 SingleFiberUnbalancedOptimalTransport
 ::ComputeWassersteinDistanceFomData()
 {
-    vtkSmartPointer <vtkGenericCell> firstCell = vtkGenericCell::New();
-    vtkSmartPointer <vtkGenericCell> secondCell = vtkGenericCell::New();
-
-    m_FirstDataset->GetCell(m_FiberIndexInFirstDataset, firstCell);
-    m_SecondDataset->GetCell(m_FiberIndexInSecondDataset, secondCell);
-
-    unsigned int nbPointsFirst = firstCell->GetNumberOfPoints();
-    unsigned int nbPointsSecond = secondCell->GetNumberOfPoints();
+    unsigned int nbPointsFirst = m_FirstDatasetCell->GetNumberOfPoints();
+    unsigned int nbPointsSecond = m_SecondDatasetCell->GetNumberOfPoints();
 
     m_WassersteinSquaredDistance = 0.0;
     std::vector <double> distKLUVector(nbPointsFirst, 0.0);
@@ -500,7 +480,7 @@ SingleFiberUnbalancedOptimalTransport
 
     for (unsigned int i = 0;i < nbPointsFirst;++i)
     {
-        vtkIdType tmpId = firstCell->GetPointId(i);
+        vtkIdType tmpId = m_FirstDatasetCell->GetPointId(i);
         double aValue = m_SegmentLengthsFirstDataset->GetValue(tmpId);
 
         double xlnx = 0.0;
@@ -512,7 +492,7 @@ SingleFiberUnbalancedOptimalTransport
 
     for (unsigned int i = 0;i < nbPointsSecond;++i)
     {
-        vtkIdType tmpId = secondCell->GetPointId(i);
+        vtkIdType tmpId = m_SecondDatasetCell->GetPointId(i);
         double bValue = m_SegmentLengthsFirstDataset->GetValue(tmpId);
 
         double xlnx = 0.0;

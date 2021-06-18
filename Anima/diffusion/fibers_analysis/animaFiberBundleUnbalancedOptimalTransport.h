@@ -61,7 +61,7 @@ protected:
     } ThreadArguments;
 
     static ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadPrepare(void *arg);
-    void ComputeExtraDataOnCell(unsigned int cellIndex, unsigned int dataIndex);
+    void ComputeExtraDataOnCell(unsigned int cellIndex, vtkGenericCell *cellData, unsigned int dataIndex);
 
     static ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadPrecomputeDistanceMatrix(void *arg);
     void PrecomputeDistancesOnRange(unsigned int startIndex, unsigned int endIndex, unsigned int threadId);

@@ -43,10 +43,11 @@ FiberBundlePointwiseUnbalancedOptimalTransport
 
     if (m_Verbose)
         std::cout << "Required memory to precompute distance matrix: " << dataSize << " Gb" << std::endl;
+
     bool precomputeDistanceMatrix = (dataSize < m_MemorySizeLimit);
 
     if (m_Verbose)
-        std::cout << "Precomputing? " << precomputeDistanceMatrix << std::endl;
+        std::cout << "Precomputing? " << (precomputeDistanceMatrix ? "Yes" : "No") << std::endl;
 
     if (precomputeDistanceMatrix)
        this->PrecomputeDistanceMatrix();

@@ -7,6 +7,7 @@
 #include <vtkSmartPointer.h>
 #include <vtkPolyData.h>
 #include <vtkDoubleArray.h>
+#include <vtkGenericCell.h>
 
 #include <vector>
 
@@ -76,6 +77,8 @@ protected:
 
     void ComputeWassersteinDistanceFomData();
 
+    vtkGenericCell *GetFirstDatasetCell() {return m_FirstDatasetCell;}
+    vtkGenericCell *GetSecondDatasetCell() {return m_SecondDatasetCell;}
     itkGetMacro(UpdateUVector, bool)
 
 private:
@@ -86,6 +89,8 @@ private:
 
     vtkSmartPointer <vtkDoubleArray> m_SegmentLengthsFirstDataset, m_SegmentLengthsSecondDataset;
     vtkSmartPointer <vtkDoubleArray> m_SegmentTangentsFirstDataset, m_SegmentTangentsSecondDataset;
+
+    vtkSmartPointer <vtkGenericCell> m_FirstDatasetCell, m_SecondDatasetCell;
 
     vnl_matrix <double> m_DistanceMatrix;
     double m_MemorySizeLimit;
