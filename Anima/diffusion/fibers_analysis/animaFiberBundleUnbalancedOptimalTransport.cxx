@@ -32,6 +32,7 @@ FiberBundleUnbalancedOptimalTransport
 
     this->PrepareInputFibersData();
 
+    m_WorkVector.resize(this->GetNumberOfWorkUnits());
     m_DistanceComputers.resize(this->GetNumberOfWorkUnits());
     for (unsigned int i = 0;i < this->GetNumberOfWorkUnits();++i)
     {
@@ -394,7 +395,7 @@ FiberBundleUnbalancedOptimalTransport
         fixedVector = &m_UVector;
     }
 
-    std::vector <double> tmpVector(nbOtherCells, 0.0);
+    m_WorkVector[threadId].resize(nbOtherCells);
 
     bool useDistMatrix = (m_DistanceMatrix.rows() != 0);
     bool transposeDistMatrix = (!m_UpdateUVector);
@@ -411,9 +412,9 @@ FiberBundleUnbalancedOptimalTransport
             if (useDistMatrix)
             {
                 if (!transposeDistMatrix)
-                    distance = m_DistanceMatrix(i,j);
+                    distance = m_DistanceMatrix.get(i,j);
                 else
-                    distance = m_DistanceMatrix(j,i);
+                    distance = m_DistanceMatrix.get(j,i);
             }
             else
             {
@@ -423,10 +424,10 @@ FiberBundleUnbalancedOptimalTransport
                     distance = this->ComputeDistance(j,i,threadId);
             }
 
-            tmpVector[j] = fixedVector->operator[](j) - distance / m_EpsilonValue;
+            m_WorkVector[threadId][j] = fixedVector->operator[](j) - distance / m_EpsilonValue;
         }
 
-        updatedVector->operator[](i) -= lambda * anima::ExponentialSum(tmpVector);
+        updatedVector->operator[](i) -= lambda * anima::ExponentialSum(m_WorkVector[threadId]);
     }
 }
 

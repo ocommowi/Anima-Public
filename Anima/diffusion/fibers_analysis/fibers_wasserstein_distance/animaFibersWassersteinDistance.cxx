@@ -21,8 +21,8 @@ int main(int argc, char **argv)
     TCLAP::ValueArg <unsigned int> precisionArg("p","precision","Precision of values output (integer, default: 6)",false,6,"precision",cmd);
     TCLAP::ValueArg <unsigned int> nbThreadsArg("T","nb-threads","Number of threads to run on (default: all available)",false,itk::MultiThreaderBase::GetGlobalDefaultNumberOfThreads(),"number of threads",cmd);
 
-    TCLAP::ValueArg <double> rhoArg("R","rho","Rho value in unbalanced optimal transport (default: 1.0)",false,1.0,"number of threads",cmd);
-    TCLAP::ValueArg <double> epsilonArg("E","epsilon","Epsilon value in unbalanced optimal transport (default: sqrt(0.07))",false,std::sqrt(0.07),"number of threads",cmd);
+    TCLAP::ValueArg <double> rhoArg("R","rho","Rho value in unbalanced optimal transport (default: 100.0)",false,100.0,"rho value in UOT",cmd);
+    TCLAP::ValueArg <double> epsilonArg("E","epsilon","Epsilon value in unbalanced optimal transport (default: sqrt(0.07))",false,std::sqrt(0.07),"epsilon value in UOT",cmd);
 
     TCLAP::ValueArg <double> stopThrArg("s","stop-thr","Relative threshold to stop iterations (default: 1.0e-4)",false,1.0e-4,"relative stop threshold",cmd);
     TCLAP::ValueArg <double> memoryLimitArg("M","mem-lim","Memory limit to precompute distance matrix (in Gb, default: 8)",false,8.0,"memory limit",cmd);

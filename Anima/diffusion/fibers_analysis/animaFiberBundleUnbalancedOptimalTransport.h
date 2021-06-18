@@ -93,6 +93,7 @@ private:
     // Sinkhorn variables
     std::vector <double> m_UVector, m_VVector;
     std::vector <double> m_OldUVector, m_OldVVector;
+    std::vector < std::vector <double> > m_WorkVector;
     double m_RhoValue, m_EpsilonValue;
     double m_RelativeStopCriterion;
     bool m_UpdateUVector;

@@ -31,6 +31,8 @@ SingleFiberUnbalancedOptimalTransport
 ::Update()
 {
     this->GetMultiThreader()->SetNumberOfWorkUnits(this->GetNumberOfWorkUnits());
+    m_WorkVector.resize(this->GetNumberOfWorkUnits());
+
     m_WassersteinSquaredDistance = 0.0;
 
     this->PrepareInputFibersData();
@@ -371,14 +373,14 @@ SingleFiberUnbalancedOptimalTransport
     if (nbThread == numTotalThread - 1)
         endIndex = nbPoints;
 
-    tmpArg->uotPtr->ComputeVectorUpdateOnRange(startIndex, endIndex);
+    tmpArg->uotPtr->ComputeVectorUpdateOnRange(startIndex, endIndex, nbThread);
 
     return ITK_THREAD_RETURN_DEFAULT_VALUE;
 }
 
 void
 SingleFiberUnbalancedOptimalTransport
-::ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex)
+::ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex, unsigned int threadId)
 {
     unsigned int nbPoints = 0;
     unsigned int nbOtherPoints = 0;
@@ -400,12 +402,11 @@ SingleFiberUnbalancedOptimalTransport
         fixedVector = &m_UVector;
     }
 
-    std::vector <double> tmpVector(nbOtherPoints, 0.0);
-
     bool useDistMatrix = (m_DistanceMatrix.rows() != 0);
     bool transposeDistMatrix = (!m_UpdateUVector);
     double lambda = m_RhoValue / (m_RhoValue + m_EpsilonValue);
 
+    m_WorkVector[threadId].resize(nbOtherPoints);
     for (unsigned int i = startIndex;i < endIndex;++i)
     {
         double weightValue = 1.0;
@@ -429,9 +430,9 @@ SingleFiberUnbalancedOptimalTransport
             if (useDistMatrix)
             {
                 if (!transposeDistMatrix)
-                    distance = m_DistanceMatrix(i,j);
+                    distance = m_DistanceMatrix.get(i,j);
                 else
-                    distance = m_DistanceMatrix(j,i);
+                    distance = m_DistanceMatrix.get(j,i);
             }
             else
             {
@@ -441,10 +442,10 @@ SingleFiberUnbalancedOptimalTransport
                     distance = this->ComputeDistance(j,i);
             }
 
-            tmpVector[j] = fixedVector->operator[](j) - distance / m_EpsilonValue;
+            m_WorkVector[threadId][j] = fixedVector->operator[](j) - distance / m_EpsilonValue;
         }
 
-        updatedVector->operator[](i) -= lambda * anima::ExponentialSum(tmpVector);
+        updatedVector->operator[](i) -= lambda * anima::ExponentialSum(m_WorkVector[threadId]);
     }
 }
 

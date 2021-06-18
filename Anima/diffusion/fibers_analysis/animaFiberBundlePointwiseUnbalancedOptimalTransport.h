@@ -63,7 +63,7 @@ protected:
     double ComputeDistance(unsigned int firstIndex, unsigned int secondIndex);
 
     static ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadVectorUpdate(void *arg);
-    void ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex);
+    void ComputeVectorUpdateOnRange(unsigned int startIndex, unsigned int endIndex, unsigned int threadId);
 
     void ComputeWassersteinDistanceFomData();
 
@@ -89,6 +89,7 @@ private:
     // Sinkhorn variables
     std::vector <double> m_UVector, m_VVector;
     std::vector <double> m_OldUVector, m_OldVVector;
+    std::vector < std::vector <double> > m_WorkVector;
     double m_RhoValue, m_EpsilonValue;
     double m_RelativeStopCriterion;
     bool m_UpdateUVector;
