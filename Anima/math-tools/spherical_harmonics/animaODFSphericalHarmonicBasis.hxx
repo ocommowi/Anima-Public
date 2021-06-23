@@ -254,4 +254,64 @@ getCurvatureAtPosition(const T &coefficients, double theta, double phi)
     return num / denom;
 }
 
+template <class T>
+double
+ODFSphericalHarmonicBasis::
+getAbsoluteUpperBound(const T &coefficients)
+{
+    double resVal = 0;
+    double tmpVal;
+
+    for (unsigned int k = 0;k <= (int)m_LOrder;k += 2)
+    {
+        unsigned int kIndexCoef = k * (k + 1) / 2;
+        unsigned int kIndexSH = k * k / 4;
+
+        for (unsigned int m = 0;m <= k;++m)
+        {
+            tmpVal = m_SphericalHarmonics[kIndexSH + m].getSHAbsoluteBound();
+
+            if (m != 0)
+            {
+                // Part for m > 0
+                resVal += sqrt(2.0) * std::abs(coefficients[kIndexCoef + m]) * tmpVal;
+
+                // Part for m < 0
+                resVal += sqrt(2.0) * std::abs(coefficients[kIndexCoef - m]) * tmpVal;
+            }
+            else
+                resVal += std::abs(coefficients[kIndexCoef]) * tmpVal;
+        }
+    }
+
+    return resVal;
+}
+
+template <class T>
+void
+ODFSphericalHarmonicBasis::
+getDirectionSampleFromODF(const T &coefficients, T &outputDirection, std::mt19937 &generator)
+{
+    std::uniform_real_distribution<double> uniDbl(0.0,1.0);
+    double upperBound = this->getAbsoluteUpperBound(coefficients);
+
+    bool continueLoop = true;
+    double theta, phi;
+    while (continueLoop)
+    {
+        theta = std::acos(1.0 - 2.0 * uniDbl(generator));
+        phi = 2.0 * M_PI * uniDbl(generator);
+
+        double shBValue = this->getValueAtPosition(coefficients, theta, phi);
+
+        double thr = uniDbl(generator) * upperBound;
+        if (shBValue < thr)
+            continueLoop = false;
+    }
+
+    outputDirection[0] = std::sin(theta) * std::cos(phi);
+    outputDirection[1] = std::sin(theta) * std::sin(phi);
+    outputDirection[2] = std::cos(theta);
+}
+
 } // end of namespace anima

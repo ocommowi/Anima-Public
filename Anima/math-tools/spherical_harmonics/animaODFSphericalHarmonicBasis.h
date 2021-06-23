@@ -5,6 +5,8 @@
 #include <vector>
 #include <AnimaSHToolsExport.h>
 
+#include <random>
+
 namespace anima
 {
 class ANIMASHTOOLS_EXPORT ODFSphericalHarmonicBasis
@@ -35,6 +37,11 @@ public:
 
     template <class T> double getCurvatureAtPosition(const T &coefficients,
                                   double theta, double phi);
+
+    template <class T> double getAbsoluteUpperBound(const T &coefficients);
+
+    template <class T> void getDirectionSampleFromODF(const T &coefficients, T &outputDirection,
+                                                      std::mt19937 &generator);
 
     double getNthSHValueAtPosition(int k, int m, double theta, double phi);
 

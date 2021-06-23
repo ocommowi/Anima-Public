@@ -25,6 +25,8 @@ public:
 
     std::complex <double> getThetaPhiDerivative(const double& theta, const double& phi);
 
+    double getSHAbsoluteBound();
+
 private:
     void UpdateSQRTFactor();
     int m_L;

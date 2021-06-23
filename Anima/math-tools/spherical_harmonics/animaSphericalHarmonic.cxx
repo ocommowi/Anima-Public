@@ -145,4 +145,19 @@ std::complex <double> SphericalHarmonic::getThetaPhiDerivative(const double& the
     return factor * retval;
 }
 
+double SphericalHarmonic::getSHAbsoluteBound()
+{
+    if (m_M == 0)
+        return std::sqrt((2*m_L + 1) / (4 * M_PI));
+    else if (m_M < 5)
+    {
+        double value = std::sqrt((2*m_L + 1) / (8 * M_PI));
+        return value;
+    }
+
+    double powValue = std::pow(2.0 / (m_M * M_PI), 0.25);
+    double value = std::sqrt(2 * m_L + 1) * powValue / M_PI;
+    return value;
+}
+
 } // end of namespace anima
