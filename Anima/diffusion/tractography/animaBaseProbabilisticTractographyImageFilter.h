@@ -77,51 +77,17 @@ public:
         { return (f.second < s.second); }
     };
 
-    /**
-     * @brief Which direction should the very first direction point to? (used in conjunction with InitialDirectionMode)
-     * Center: towards gravity center
-     * Outward: outward from gravity center
-     * Top: Image top (z axis)
-     * Bottom: Image bottom (reverse z axis)
-     * ...
-     */
-    enum ColinearityDirectionType
-    {
-        Center = 0,
-        Outward,
-        Top,
-        Bottom,
-        Left,
-        Right,
-        Front,
-        Back
-    };
-
-    /**
-     * @brief Tells how to choose the very first direction of each particle
-     * Colinear: Most colinear to colinear direction specified (ColinearityDirectionType)
-     * Weight: Model direction with the highest weight
-     */
-    enum InitialDirectionModeType
-    {
-        Colinear = 0,
-        Weight
-    };
-
     struct FiberWorkType
     {
         FiberProcessVectorType fiberParticles;
         MembershipType classMemberships;
         std::vector <MembershipType> reverseClassMemberships;
         MembershipType classSizes;
-        ListType particleWeights;
-        ListType classWeights;
+        ListType logParticleWeights, logNormalizedParticleWeights;
+        ListType previousUpdateLogWeights;
+        ListType logClassWeights;
         std::vector <bool> stoppedParticles;
     };
-
-    void SetInitialColinearityDirection(const ColinearityDirectionType &colDir) {m_InitialColinearityDirection = colDir;}
-    void SetInitialDirectionMode(const InitialDirectionModeType &dir) {m_InitialDirectionMode = dir;}
-    itkGetMacro(InitialDirectionMode,InitialDirectionModeType)
 
     virtual void SetInputModelImage(InputModelImageType *inImage) {m_InputModelImage = inImage;}
     InputModelImageType *GetInputModelImage() {return m_InputModelImage;}
@@ -192,6 +158,19 @@ protected:
     //! This ugly guy is the heart of multi-modal probabilistic tractography, making decisions on split and merges of particles
     unsigned int UpdateClassesMemberships(FiberWorkType &fiberData, DirectionVectorType &directions, std::mt19937 &random_generator);
 
+    //! Performs the weight update part at each iteration
+    void UpdateWeightsFromCurrentData(FiberWorkType &fiberComputationData, ListType &logWeightSums);
+
+    //! Check if occasional resampling is needed. If yes, does it
+    void CheckAndPerformOccasionalResampling(FiberWorkType &fiberComputationData, DirectionVectorType &previousDirections,
+                                             DirectionVectorType &previousDirectionsCopy, unsigned int numThread);
+
+    //! Make the particles move forward one step
+    void ProgressParticles(FiberWorkType &fiberComputationData, ContinuousIndexType &currentIndex, PointType &currentPoint,
+                           IndexType &closestIndex, ContinuousIndexType &newIndex, InterpolatorPointer &modelInterpolator,
+                           VectorType &modelValue, DirectionVectorType &previousDirections, Vector3DType &sampling_direction,
+                           Vector3DType &newDirection, unsigned int numThread);
+
     //! This guy takes the result of computefiber and merges the classes, each one becomes one fiber
     // Returns in outputMerged several fibers, as of now if there are active particles it returns only the merge of those, and returns true.
     // Otherwise, returns false and a merge per stopped fiber lengths
@@ -213,7 +192,8 @@ protected:
     virtual void ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index, VectorType &modelValue) = 0;
 
     //! Initialize first direction from user input (model dependent, not implemented here)
-    virtual Vector3DType InitializeFirstIterationFromModel(Vector3DType &colinearDir, VectorType &modelValue, unsigned int threadId) = 0;
+    virtual Vector3DType InitializeFirstIterationFromModel(VectorType &modelValue, unsigned int threadId,
+                                                           DirectionVectorType &initialDirections) = 0;
 
     //! Check stopping criterions to stop a particle (model dependent, not implemented here)
     virtual bool CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId) = 0;
@@ -253,10 +233,6 @@ private:
     ScalarInterpolatorPointer m_B0Interpolator, m_NoiseInterpolator;
 
     std::vector <std::mt19937> m_Generators;
-
-    ColinearityDirectionType m_InitialColinearityDirection;
-    InitialDirectionModeType m_InitialDirectionMode;
-    Vector3DType m_DWIGravityCenter;
 
     FiberProcessVectorType m_PointsToProcess;
     MembershipType m_FilteringValues;
