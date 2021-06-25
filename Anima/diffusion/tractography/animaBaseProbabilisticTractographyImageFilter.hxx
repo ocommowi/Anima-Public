@@ -51,9 +51,6 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     m_ComputeLocalColors = true;
     m_MAPMergeFibers = true;
 
-    m_InitialColinearityDirection = Center;
-    m_InitialDirectionMode = Weight;
-
     m_Generators.clear();
 
     m_HighestProcessedSeed = 0;
@@ -467,6 +464,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     fiberComputationData.stoppedParticles = std::vector <bool> (m_NumberOfParticles,false);
     fiberComputationData.classSizes = MembershipType(numberOfClasses,m_NumberOfParticles);
     fiberComputationData.logClassWeights = ListType(numberOfClasses, - std::log(numberOfClasses));
+    fiberComputationData.fiberNumberOfSegments = ListType(m_NumberOfParticles, 0);
     //We need membership vectors in each direction
     fiberComputationData.classMemberships = MembershipType(m_NumberOfParticles,0);
     fiberComputationData.reverseClassMemberships.resize(numberOfClasses);
@@ -481,7 +479,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     DirectionVectorType previousDirectionsCopy;
 
     VectorType modelValue(m_ModelDimension);
-    Vector3DType sampling_direction(0.0), newDirection;
+    Vector3DType newDirection;
     PointType currentPoint;
     ContinuousIndexType currentIndex, newIndex;
     IndexType closestIndex;
@@ -501,43 +499,22 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     this->InitializeFirstIterationFromModel(modelValue,numThread,previousDirections);
 
     // Perform the forward progression
-    unsigned int numIter = 0;
     bool stopLoop = false;
+    unsigned int maxIterations = m_MaxLengthFiber / m_StepProgression;
+
     while (!stopLoop)
     {
-        ++numIter;
-
         logWeightSums.resize(numberOfClasses);
         std::fill(logWeightSums.begin(),logWeightSums.end(),0.0);
 
         this->ProgressParticles(fiberComputationData,currentIndex,currentPoint,closestIndex,newIndex,modelInterpolator,
-                                modelValue,previousDirections,sampling_direction,newDirection,numThread);
-
-        // Continue only if some particles are still moving
-        stopLoop = true;
-        for (unsigned int i = 0;i < m_NumberOfParticles;++i)
-        {
-            if (!fiberComputationData.stoppedParticles[i])
-            {
-                stopLoop = false;
-                break;
-            }
-        }
-
-        if (stopLoop)
-            continue;
+                                modelValue,previousDirections,newDirection,numThread);
 
         // Update weights
         this->UpdateWeightsFromCurrentData(fiberComputationData,logWeightSums);
 
         // Resampling if necessary
         this->CheckAndPerformOccasionalResampling(fiberComputationData,previousDirections,previousDirectionsCopy,numThread);
-
-        // We need stopping criterions
-        // Length is easy, given that each step is constant we just need to check the fiber size: numIter
-        // Example :
-        if (numIter > m_MaxLengthFiber / m_StepProgression)
-            stopLoop = true;
 
         numberOfClasses = this->UpdateClassesMemberships(fiberComputationData,previousDirections,m_Generators[numThread]);
 
@@ -546,24 +523,113 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
             if (!std::isfinite(fiberComputationData.logParticleWeights[i]))
                 itkExceptionMacro("Nan weights after update class membership");
         }
+
+        // Continue only if some particles are still moving
+        stopLoop = true;
+        for (unsigned int i = 0;i < m_NumberOfParticles;++i)
+        {
+            if (fiberComputationData.fiberNumberOfSegments[i] == maxIterations)
+                fiberComputationData.stoppedParticles[i] = true;
+
+            if (!fiberComputationData.stoppedParticles[i])
+            {
+                stopLoop = false;
+                break;
+            }
+        }
     }
 
     // Prepare backward loop
-//    stopLoop = true;
-//    for (unsigned int i = 0;i < m_NumberOfParticles;++i)
-//    {
-//        if (fiberComputationData.fiberParticles[i].size() <= m_MaxLengthFiber / m_StepProgression)
-//        {
-//            stopLoop = false;
-//            fiberComputationData.stoppedParticles[i] = false;
-//        }
-//    }
+    stopLoop = true;
+    FiberType invertedFiber;
+    bool is2d = m_InputModelImage->GetLargestPossibleRegion().GetSize()[2] == 1;
 
-//    // Now perform the backward progression
-//    while (!stopLoop)
-//    {
+    for (unsigned int i = 0;i < m_NumberOfParticles;++i)
+    {
+        // Unstop particles
+        if (fiberComputationData.fiberNumberOfSegments[i] <= maxIterations)
+        {
+            stopLoop = false;
+            fiberComputationData.stoppedParticles[i] = false;
+        }
 
-//    }
+        // Change fiber order, previous direction and log weight update
+        invertedFiber.resize(fiberComputationData.fiberNumberOfSegments[i]);
+        FiberType::reverse_iterator fiberItr;
+        unsigned int pos = 0;
+        for (fiberItr = fiberComputationData.fiberParticles[i].rbegin(); fiberItr != fiberComputationData.fiberParticles[i].rend(); ++fiberItr)
+        {
+            invertedFiber[pos] = *fiberItr;
+            ++pos;
+        }
+
+        fiberComputationData.fiberParticles[i] = invertedFiber;
+
+        currentPoint = fiberComputationData.fiberParticles[i].back();
+        m_SeedMask->TransformPhysicalPointToContinuousIndex(currentPoint,currentIndex);
+        modelValue.Fill(0.0);
+
+        this->ComputeModelValue(modelInterpolator, currentIndex, modelValue);
+
+        if (fiberComputationData.fiberNumberOfSegments[i] == 0)
+        {
+            this->SampleDirectionFromModel(modelValue, previousDirections[i]);
+
+            if (previousDirections[i][1 + is2d] > 0)
+                previousDirections[i] *= -1;
+
+            fiberComputationData.previousUpdateLogWeights[i] = - std::log(m_NumberOfParticles);
+        }
+        else
+        {
+            unsigned int lastIndex = fiberComputationData.fiberNumberOfSegments[i] - 1;
+            previousDirections[i] = fiberComputationData.fiberParticles[i][lastIndex] - fiberComputationData.fiberParticles[i][lastIndex - 1];
+            anima::Normalize(previousDirections[i],previousDirections[i]);
+
+            estimatedB0Value = m_B0Interpolator->EvaluateAtContinuousIndex(currentIndex);
+            estimatedNoiseValue = m_NoiseInterpolator->EvaluateAtContinuousIndex(currentIndex);
+
+            fiberComputationData.previousUpdateLogWeights[i] = this->ComputeLogWeightUpdate(estimatedB0Value, estimatedNoiseValue, previousDirections[i], modelValue, numThread);
+        }
+    }
+
+    // Now that the fibers have been reversed and updated, perform the backward progression
+    while (!stopLoop)
+    {
+        logWeightSums.resize(numberOfClasses);
+        std::fill(logWeightSums.begin(),logWeightSums.end(),0.0);
+
+        this->ProgressParticles(fiberComputationData,currentIndex,currentPoint,closestIndex,newIndex,modelInterpolator,
+                                modelValue,previousDirections,newDirection,numThread);
+
+        // Update weights
+        this->UpdateWeightsFromCurrentData(fiberComputationData,logWeightSums);
+
+        // Resampling if necessary
+        this->CheckAndPerformOccasionalResampling(fiberComputationData,previousDirections,previousDirectionsCopy,numThread);
+
+        numberOfClasses = this->UpdateClassesMemberships(fiberComputationData,previousDirections,m_Generators[numThread]);
+
+        for (unsigned int i = 0;i < fiberComputationData.logParticleWeights.size();++i)
+        {
+            if (!std::isfinite(fiberComputationData.logParticleWeights[i]))
+                itkExceptionMacro("Nan weights after update class membership");
+        }
+
+        // Continue only if some particles are still moving
+        stopLoop = true;
+        for (unsigned int i = 0;i < m_NumberOfParticles;++i)
+        {
+            if (fiberComputationData.fiberNumberOfSegments[i] == maxIterations)
+                fiberComputationData.stoppedParticles[i] = true;
+
+            if (!fiberComputationData.stoppedParticles[i])
+            {
+                stopLoop = false;
+                break;
+            }
+        }
+    }
 
     // Now that we're done, if we don't keep individual particles, merge them cluster by cluster
     if (m_MAPMergeFibers)
@@ -591,7 +657,7 @@ void
 BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 ::ProgressParticles(FiberWorkType &fiberComputationData, ContinuousIndexType &currentIndex, PointType &currentPoint,
                     IndexType &closestIndex, ContinuousIndexType &newIndex, InterpolatorPointer &modelInterpolator,
-                    VectorType &modelValue, DirectionVectorType &previousDirections, Vector3DType &sampling_direction,
+                    VectorType &modelValue, DirectionVectorType &previousDirections,
                     Vector3DType &newDirection, unsigned int numThread)
 {
     double estimatedNoiseValue = 20.0;
@@ -644,9 +710,9 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
         }
 
         // Propose a new direction based on the previous one and the diffusion information at current position
-        double log_prior = 0, log_proposal = 0;
-        newDirection = this->ProposeNewDirection(previousDirections[i], modelValue, sampling_direction, log_prior,
-                                                 log_proposal, m_Generators[numThread], numThread);
+        newDirection = this->ProposeNewDirection(previousDirections[i], modelValue, m_Generators[numThread], numThread);
+
+        fiberComputationData.fiberNumberOfSegments[i]++;
 
         // Update the position of the particle
         for (unsigned int j = 0;j < InputModelImageType::ImageDimension;++j)
@@ -675,7 +741,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
         // Update the weight of the particle
         fiberComputationData.previousUpdateLogWeights[i] = this->ComputeLogWeightUpdate(estimatedB0Value, estimatedNoiseValue, newDirection,
-                                                                                        modelValue, log_prior, log_proposal, numThread);
+                                                                                        modelValue, numThread);
 
         fiberComputationData.logParticleWeights[i] += fiberComputationData.previousUpdateLogWeights[i];
     }

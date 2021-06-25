@@ -86,6 +86,7 @@ public:
         ListType logParticleWeights, logNormalizedParticleWeights;
         ListType previousUpdateLogWeights;
         ListType logClassWeights;
+        std::vector <unsigned int> fiberNumberOfSegments;
         std::vector <bool> stoppedParticles;
     };
 
@@ -168,8 +169,8 @@ protected:
     //! Make the particles move forward one step
     void ProgressParticles(FiberWorkType &fiberComputationData, ContinuousIndexType &currentIndex, PointType &currentPoint,
                            IndexType &closestIndex, ContinuousIndexType &newIndex, InterpolatorPointer &modelInterpolator,
-                           VectorType &modelValue, DirectionVectorType &previousDirections, Vector3DType &sampling_direction,
-                           Vector3DType &newDirection, unsigned int numThread);
+                           VectorType &modelValue, DirectionVectorType &previousDirections, Vector3DType &newDirection,
+                           unsigned int numThread);
 
     //! This guy takes the result of computefiber and merges the classes, each one becomes one fiber
     // Returns in outputMerged several fibers, as of now if there are active particles it returns only the merge of those, and returns true.
@@ -180,20 +181,19 @@ protected:
     FiberProcessVectorType FilterOutputFibers(FiberProcessVectorType &fibers, ListType &weights);
 
     //! Propose new direction for a particle, given the old direction, and a model (model dependent, not implemented here)
-    virtual Vector3DType ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
-                                             Vector3DType &sampling_direction, double &log_prior, double &log_proposal,
-                                             std::mt19937 &random_generator, unsigned int threadId) = 0;
+    virtual Vector3DType ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue, std::mt19937 &random_generator,
+                                             unsigned int threadId) = 0;
 
     //! Update particle weight based on an underlying model and the chosen direction (model dependent, not implemented here)
     virtual double ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &newDirection, VectorType &modelValue,
-                                          double &log_prior, double &log_proposal, unsigned int threadId) = 0;
+                                          unsigned int threadId) = 0;
 
     //! Estimate model from raw diffusion data (model dependent, not implemented here)
     virtual void ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index, VectorType &modelValue) = 0;
 
     //! Initialize first direction from user input (model dependent, not implemented here)
-    virtual Vector3DType InitializeFirstIterationFromModel(VectorType &modelValue, unsigned int threadId,
-                                                           DirectionVectorType &initialDirections) = 0;
+    virtual void InitializeFirstIterationFromModel(VectorType &modelValue, unsigned int threadId,
+                                                   DirectionVectorType &initialDirections) = 0;
 
     //! Check stopping criterions to stop a particle (model dependent, not implemented here)
     virtual bool CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId) = 0;
