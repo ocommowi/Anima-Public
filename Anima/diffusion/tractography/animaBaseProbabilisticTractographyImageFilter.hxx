@@ -655,6 +655,32 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 template <class TInputModelImageType>
 void
 BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+::InitializeFirstIterationFromModel(VectorType &modelValue, unsigned int threadId,
+                                    DirectionVectorType &initialDirections)
+{
+    initialDirections.resize(m_NumberOfParticles);
+    Vector3DType nullDirection(0.0), zDirection(0.0);
+    zDirection[2] = 1.0;
+    bool is2d = (m_InputModelImage->GetLargestPossibleRegion().GetSize()[2] == 1);
+
+    for (unsigned int i = 0;i < m_NumberOfParticles;++i)
+    {
+        initialDirections[i] = this->ProposeNewDirection(nullDirection, modelValue, m_Generators[threadId], threadId);
+
+        if (anima::ComputeScalarProduct(zDirection,initialDirections[i]) < 0)
+            initialDirections[i] *= -1.0;
+
+        if (is2d)
+        {
+            initialDirections[i][2] = 0.0;
+            anima::Normalize(initialDirections[i],initialDirections[i]);
+        }
+    }
+}
+
+template <class TInputModelImageType>
+void
+BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 ::ProgressParticles(FiberWorkType &fiberComputationData, ContinuousIndexType &currentIndex, PointType &currentPoint,
                     IndexType &closestIndex, ContinuousIndexType &newIndex, InterpolatorPointer &modelInterpolator,
                     VectorType &modelValue, DirectionVectorType &previousDirections,

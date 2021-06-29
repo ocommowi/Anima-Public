@@ -166,6 +166,10 @@ protected:
     void CheckAndPerformOccasionalResampling(FiberWorkType &fiberComputationData, DirectionVectorType &previousDirections,
                                              DirectionVectorType &previousDirectionsCopy, unsigned int numThread);
 
+    //! Initialize first direction from user input (model dependent, not implemented here)
+    virtual void InitializeFirstIterationFromModel(VectorType &modelValue, unsigned int threadId,
+                                                   DirectionVectorType &initialDirections);
+
     //! Make the particles move forward one step
     void ProgressParticles(FiberWorkType &fiberComputationData, ContinuousIndexType &currentIndex, PointType &currentPoint,
                            IndexType &closestIndex, ContinuousIndexType &newIndex, InterpolatorPointer &modelInterpolator,
@@ -180,6 +184,12 @@ protected:
     //! Filter output fibers by ROIs and compute local colors
     FiberProcessVectorType FilterOutputFibers(FiberProcessVectorType &fibers, ListType &weights);
 
+    //! Computes additional scalar maps that are model dependent to add to the output
+    virtual void ComputeAdditionalScalarMaps() {}
+
+    //////////
+    // Pure virtual methods, to be defined in child classes
+
     //! Propose new direction for a particle, given the old direction, and a model (model dependent, not implemented here)
     virtual Vector3DType ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue, std::mt19937 &random_generator,
                                              unsigned int threadId) = 0;
@@ -191,15 +201,8 @@ protected:
     //! Estimate model from raw diffusion data (model dependent, not implemented here)
     virtual void ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index, VectorType &modelValue) = 0;
 
-    //! Initialize first direction from user input (model dependent, not implemented here)
-    virtual void InitializeFirstIterationFromModel(VectorType &modelValue, unsigned int threadId,
-                                                   DirectionVectorType &initialDirections) = 0;
-
     //! Check stopping criterions to stop a particle (model dependent, not implemented here)
     virtual bool CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId) = 0;
-
-    //! Computes additional scalar maps that are model dependent to add to the output
-    virtual void ComputeAdditionalScalarMaps() {}
 
 private:
     ITK_DISALLOW_COPY_AND_ASSIGN(BaseProbabilisticTractographyImageFilter);
