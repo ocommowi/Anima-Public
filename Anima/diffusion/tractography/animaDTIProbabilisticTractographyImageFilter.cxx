@@ -19,7 +19,6 @@ namespace anima
 DTIProbabilisticTractographyImageFilter::DTIProbabilisticTractographyImageFilter()
 : BaseProbabilisticTractographyImageFilter()
 {
-    m_ThresholdForProlateTensor = 0.25;
     m_FAThreshold = 0.2;
     
     this->SetModelDimension(6);
@@ -31,133 +30,24 @@ DTIProbabilisticTractographyImageFilter::~DTIProbabilisticTractographyImageFilte
 
 DTIProbabilisticTractographyImageFilter::Vector3DType
 DTIProbabilisticTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
-                                                             Vector3DType &sampling_direction, double &log_prior,
-                                                             double &log_proposal, std::mt19937 &random_generator,
-                                                             unsigned int threadId)
+                                                             std::mt19937 &random_generator, unsigned int threadId)
 {
-    Vector3DType resVec(0.0);
-    
-    double concentrationParameter;
-    bool is2d = this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] <= 1;
-    double LC = this->GetLinearCoefficient(modelValue);
-    
-    if (LC > m_ThresholdForProlateTensor)
-    {
+    Vector3DType meanVec(0.0), resVec(0.0);
+    vnl_matrix <double> tensor(3,3);
+    anima::GetTensorFromVectorRepresentation(modelValue, tensor);
+    anima::SampleFromMultivariateGaussianDistribution(meanVec,tensor,resVec,random_generator);
 
-        this->GetDTIPrincipalDirection(modelValue, sampling_direction, is2d);
-                
-        if (anima::ComputeScalarProduct(oldDirection, sampling_direction) < 0)
-            sampling_direction *= -1;
-        
-        double FA = this->GetFractionalAnisotropy(modelValue);
-                
-        concentrationParameter = this->GetKappaFromFA(FA);
-    }
-    else
-    {
-        sampling_direction = oldDirection;
-        concentrationParameter = this->GetKappaOfPriorDistribution();
-    }
-    
-//    if (concentrationParameter > 700)
-//        anima::SampleFromVMFDistributionNumericallyStable(concentrationParameter,sampling_direction,resVec,random_generator);
-//    else
-//        anima::SampleFromVMFDistribution(concentrationParameter,sampling_direction,resVec,random_generator);
-
-    anima::SampleFromWatsonDistribution(concentrationParameter,sampling_direction,resVec,3,random_generator);
-    
+    resVec.Normalize();
+    bool is2d = (this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] <= 1);
     if (is2d)
     {
         resVec[InputModelImageType::ImageDimension - 1] = 0;
         resVec.Normalize();
     }
-    
-    if (LC > m_ThresholdForProlateTensor)
-    {
-//        log_prior = anima::safe_log(anima::ComputeVMFPdf(resVec, oldDirection, this->GetKappaOfPriorDistribution()));
-        log_prior = anima::safe_log(anima::EvaluateWatsonPDF(resVec, oldDirection, this->GetKappaOfPriorDistribution()));
 
-//        log_proposal = anima::safe_log(anima::ComputeVMFPdf(resVec, sampling_direction, concentrationParameter));
-        log_proposal = anima::safe_log(anima::EvaluateWatsonPDF(resVec, sampling_direction, concentrationParameter));
-    }
-    
     if (anima::ComputeScalarProduct(oldDirection, resVec) < 0)
         resVec *= -1;
 
-    return resVec;
-}
-
-DTIProbabilisticTractographyImageFilter::Vector3DType
-DTIProbabilisticTractographyImageFilter::
-InitializeFirstIterationFromModel(Vector3DType &colinearDir, VectorType &modelValue, unsigned int threadId)
-{    
-    Vector3DType resVec, tmpVec;
-    bool is2d = (this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] == 1);
-	
-    itk::SymmetricEigenAnalysis <Matrix3DType,Vector3DType,Matrix3DType> EigenAnalysis(InputModelImageType::ImageDimension);
-    EigenAnalysis.SetOrderEigenValues(true);
-
-    Matrix3DType dtiTensor, eigVecs;
-    Vector3DType eigVals;
-
-    unsigned int pos = 0;
-    for (unsigned int i = 0;i < 3;++i)
-        for (unsigned int j = 0;j <= i;++j)
-        {
-            dtiTensor(i,j) = modelValue[pos];
-            if (j != i)
-                dtiTensor(j,i) = dtiTensor(i,j);
-            ++pos;
-        }
-
-    EigenAnalysis.ComputeEigenValuesAndVectors(dtiTensor,eigVals,eigVecs);
-
-    switch(this->GetInitialDirectionMode())
-    {
-        case Colinear:
-        {
-            double maxVal = 0;
-            for (unsigned int i = 0;i < 3;++i)
-            {
-                for (unsigned int j = 0;j < 3;++j)
-                    tmpVec[j] = eigVecs(i,j);
-
-                double tmpVal = anima::ComputeScalarProduct(colinearDir,tmpVec);
-
-                if (tmpVal < 0)
-                {
-                    tmpVec *= -1;
-                    tmpVal *= -1;
-                }
-
-                if (maxVal < tmpVal)
-                {
-                    maxVal = tmpVal;
-                    resVec = tmpVec;
-                }
-            }
-            break;
-        }
-
-        case Weight:
-        default:
-        {
-            for (unsigned int i = 0;i < 3;++i)
-                resVec[i] = eigVecs(2,i);
-
-            if (anima::ComputeScalarProduct(colinearDir, resVec) < 0)
-                resVec *= -1;
-
-            break;
-        }
-    }
-    
-    if (is2d)
-    {
-        resVec[2] = 0;
-        resVec.Normalize();
-    }
-    
     return resVec;
 }
 
@@ -186,106 +76,97 @@ bool DTIProbabilisticTractographyImageFilter::CheckModelProperties(double estima
     return true;
 }
 
-double DTIProbabilisticTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &newDirection, VectorType &modelValue, double &log_prior,
-                                                                       double &log_proposal, unsigned int threadId)
+double DTIProbabilisticTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &previousDirection,
+                                                                       Vector3DType &newDirection, VectorType &previousModelValue, VectorType &modelValue,
+                                                                       unsigned int threadId)
 {
     bool is2d = this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] <= 1;
         
-    // Computes prior, proposal and log-likelihood values
-    double logLikelihood = 0;
-    double LC = this->GetLinearCoefficient(modelValue);
+    // Prior is a Watson PDF
+    double log_prior = anima::safe_log(anima::EvaluateWatsonPDF(newDirection, previousDirection, this->GetKappaOfPriorDistribution()));
 
-    double concentrationParameter = 50.0;
-    if (noiseValue > 0)
-        concentrationParameter = b0Value / std::sqrt(noiseValue);
-    
-    if (LC > m_ThresholdForProlateTensor)
+    // Proposal is the probability to get the sampled new direction from the previous model:
+    // here line integral of the tensor along new direction
+    double log_proposal = 0.0;
+    vnl_matrix <double> tensor(3,3);
+    anima::GetTensorFromVectorRepresentation(previousModelValue, tensor);
+    itk::SymmetricEigenAnalysis < vnl_matrix <double>, vnl_diag_matrix <double> , vnl_matrix <double> > EigenAnalysis(InputModelImageType::ImageDimension);
+
+    vnl_matrix <double> eigVecs(3,3);
+    vnl_diag_matrix <double> eigVals(3);
+
+    EigenAnalysis.ComputeEigenValuesAndVectors(tensor,eigVals,eigVecs);
+
+    double detPreviousTensor = 1.0;
+    for (unsigned int i = 0;i < 3;++i)
     {
-        Vector3DType dtiPrincipalDirection(0.0);
-        
-        this->GetDTIPrincipalDirection(modelValue, dtiPrincipalDirection, is2d);
-        logLikelihood = std::log(anima::EvaluateWatsonPDF(dtiPrincipalDirection, newDirection, concentrationParameter));
+        detPreviousTensor *= eigVals[i];
+        eigVals[i] = 1.0 / eigVals[i];
     }
-    else
+
+    anima::RecomposeTensor(eigVals,eigVecs,tensor);
+    double tensorFactor = 0.0;
+    for (unsigned int i = 0;i < 3;++i)
     {
-        Vector3DType dtiMinorDirection(0.0);
-        
-        this->GetDTIMinorDirection(modelValue, dtiMinorDirection);
-        logLikelihood = std::log(anima::EvaluateWatsonPDF(dtiMinorDirection, newDirection, - concentrationParameter));
+        for (unsigned int j = i + 1;j < 3;++j)
+            tensorFactor += 2.0 * newDirection[i] * newDirection[j] * tensor(i,j);
+
+        tensorFactor += newDirection[i] * newDirection[i] * tensor(i,i);
+    }
+
+    tensorFactor *= 0.5;
+    log_proposal = - 3 * std::log(2 * M_PI) - std::log(detPreviousTensor) + std::log(M_PI) - std::log(tensorFactor);
+    log_proposal /= 2.0;
+
+    // Log-likelihood: simulate from model at arrival and from current direction viewed as generic zeppelin tensor
+    double log_likelihood = 0;
+
+    unsigned int numGradientImages = this->GetNumberOfGradientDirections();
+    Vector3DType gradient;
+    anima::GetTensorFromVectorRepresentation(modelValue, tensor);
+    vnl_matrix <double> zeppelinDirection(3,3);
+    zeppelinDirection.fill(0.0);
+
+    for (unsigned int i = 0;i < 3;++i)
+    {
+        zeppelinDirection(i,i) = 1.5e-4 + (1.71e-3 - 1.5e-4) * newDirection[i] * newDirection[i];
+        for (unsigned int j = i + 1;j < 3;++j)
+        {
+            zeppelinDirection(i,j) = (1.71e-3 - 1.5e-4) * newDirection[i] * newDirection[j];
+            zeppelinDirection(j,i) = zeppelinDirection(i,j);
+        }
+    }
+
+    for (unsigned int i = 0;i < numGradientImages;++i)
+    {
+        double internalProductModel = 0.0;
+        double internalProductDirection = 0.0;
+        double bvalue = this->GetBValueItem(i);
+        gradient = this->GetDiffusionGradient(i);
+
+        for (unsigned int j = 0;j < 3;++j)
+        {
+            internalProductModel += gradient[j] * gradient[j] * tensor(j,j);
+            internalProductDirection += gradient[j] * gradient[j] * zeppelinDirection(j,j);
+
+            for (unsigned int k = j + 1;k < 3;++k)
+            {
+                internalProductModel += 2.0 * gradient[j] * gradient[k] * tensor(j,k);
+                internalProductDirection += 2.0 * gradient[j] * gradient[k] * zeppelinDirection(j,k);
+            }
+        }
+
+        internalProductModel *= bvalue;
+        internalProductDirection *= bvalue;
+
+        double diffValue = b0Value * (std::exp(- internalProductModel) - std::exp(- internalProductDirection));
+        double logNoiseGaussValue = 0.5 * (std::log(noiseValue) + std::log(2.0 * M_PI) + diffValue * diffValue / noiseValue);
+
+        log_likelihood -= logNoiseGaussValue;
     }
     
-    double resVal = log_prior + logLikelihood - log_proposal;
+    double resVal = log_prior + log_likelihood - log_proposal;
     return resVal;
-}
-
-void DTIProbabilisticTractographyImageFilter::SetKappaPolynomialCoefficients(std::vector <double> &coefs)
-{
-    m_KappaPolynomialCoefficients.resize(coefs.size());
-    for (unsigned int i = 0;i < coefs.size();++i)
-        m_KappaPolynomialCoefficients[i] = coefs[i];
-}
-
-double DTIProbabilisticTractographyImageFilter::GetKappaFromFA(double FA)
-{
-    double resVal = 0.0;
-    for (unsigned int i = 0;i < m_KappaPolynomialCoefficients.size();++i)
-        resVal += m_KappaPolynomialCoefficients[i] * std::pow(FA, (double)i);
-    
-    return 0.5 * resVal;
-}
-
-void DTIProbabilisticTractographyImageFilter::GetDTIPrincipalDirection(const VectorType &modelValue, Vector3DType &resVec, bool is2d)
-{
-    itk::SymmetricEigenAnalysis <Matrix3DType,Vector3DType,Matrix3DType> EigenAnalysis(InputModelImageType::ImageDimension);
-    EigenAnalysis.SetOrderEigenValues(true);
-    
-    Matrix3DType dtiTensor, eigVecs;
-    Vector3DType eigVals;
-    
-    unsigned int pos = 0;
-    for (unsigned int i = 0;i < 3;++i)
-        for (unsigned int j = 0;j <= i;++j)
-        {
-            dtiTensor(i,j) = modelValue[pos];
-            if (j != i)
-                dtiTensor(j,i) = dtiTensor(i,j);
-            ++pos;
-        }
-    
-    EigenAnalysis.ComputeEigenValuesAndVectors(dtiTensor,eigVals,eigVecs);
-    
-    for (unsigned int i = 0;i < 3;++i)
-    	resVec[i] = eigVecs(2,i);
-    
-    if (is2d)
-    {
-        resVec[2] = 0;
-        resVec.Normalize();
-    }
-}
- 
-void DTIProbabilisticTractographyImageFilter::GetDTIMinorDirection(VectorType &modelValue, Vector3DType &resVec)
-{
-    itk::SymmetricEigenAnalysis <Matrix3DType,Vector3DType,Matrix3DType> EigenAnalysis(InputModelImageType::ImageDimension);
-    EigenAnalysis.SetOrderEigenValues(true);
-    
-    Matrix3DType dtiTensor, eigVecs;
-    Vector3DType eigVals;
-    
-    unsigned int pos = 0;
-    for (unsigned int i = 0;i < 3;++i)
-        for (unsigned int j = 0;j <= i;++j)
-        {
-            dtiTensor(i,j) = modelValue[pos];
-            if (j != i)
-                dtiTensor(j,i) = dtiTensor(i,j);
-            ++pos;
-        }
-    
-    EigenAnalysis.ComputeEigenValuesAndVectors(dtiTensor,eigVals,eigVecs);
-    
-    for (unsigned int i = 0;i < 3;++i)
-    	resVec[i] = eigVecs(0,i);
 }
 
 void DTIProbabilisticTractographyImageFilter::ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index,
@@ -306,33 +187,6 @@ void DTIProbabilisticTractographyImageFilter::ComputeModelValue(InterpolatorPoin
     anima::GetTensorFromVectorRepresentation(modelValue,tmpTensor);
     leCalculator->GetTensorExponential(tmpTensor,tmpTensor);
     anima::GetVectorRepresentation(tmpTensor,modelValue);
-}
-
-double DTIProbabilisticTractographyImageFilter::GetLinearCoefficient(VectorType &modelValue)
-{
-    itk::SymmetricEigenAnalysis <Matrix3DType,Vector3DType,Matrix3DType> EigenAnalysis(InputModelImageType::ImageDimension);
-    EigenAnalysis.SetOrderEigenValues(true);
-    
-    Matrix3DType dtiTensor;
-    Vector3DType eigVals;
-    
-    unsigned int pos = 0;
-    for (unsigned int i = 0;i < 3;++i)
-        for (unsigned int j = 0;j <= i;++j)
-        {
-            dtiTensor(i,j) = modelValue[pos];
-            if (j != i)
-                dtiTensor(j,i) = dtiTensor(i,j);
-            ++pos;
-        }
-    
-    EigenAnalysis.ComputeEigenValues(dtiTensor,eigVals);
-    
-    double denom = 0;
-    for (unsigned int i = 0;i < 3;++i)
-        denom += eigVals[i] * eigVals[i];
-    
-    return (eigVals[2] - eigVals[1]) / sqrt(denom);
 }
 
 double DTIProbabilisticTractographyImageFilter::GetFractionalAnisotropy(VectorType &modelValue)
@@ -371,38 +225,6 @@ double DTIProbabilisticTractographyImageFilter::GetFractionalAnisotropy(VectorTy
     
     // FA
     return std::sqrt(3.0 * num / (2.0 * denom));
-}
-
-void DTIProbabilisticTractographyImageFilter::GetEigenValueCombinations(VectorType &modelValue, double &meanLambda, double &perpLambda)
-{
-    itk::SymmetricEigenAnalysis <Matrix3DType,Vector3DType,Matrix3DType> EigenAnalysis(InputModelImageType::ImageDimension);
-    EigenAnalysis.SetOrderEigenValues(true);
-    
-    Matrix3DType dtiTensor;
-    Vector3DType eigVals;
-    
-    unsigned int pos = 0;
-    for (unsigned int i = 0;i < 3;++i)
-        for (unsigned int j = 0;j <= i;++j)
-        {
-            dtiTensor(i,j) = modelValue[pos];
-            if (j != i)
-                dtiTensor(j,i) = dtiTensor(i,j);
-            ++pos;
-        }
-    
-    EigenAnalysis.ComputeEigenValues(dtiTensor,eigVals);
-    
-    meanLambda = 0;
-    perpLambda = 0;
-    for (unsigned int i = 0;i < 3;++i)
-    {
-        meanLambda += eigVals[i];
-        if (i == 1)
-            perpLambda = meanLambda / 2.0;
-    }
-    
-    meanLambda /= 3.0;
 }
 
 void DTIProbabilisticTractographyImageFilter::ComputeAdditionalScalarMaps()
