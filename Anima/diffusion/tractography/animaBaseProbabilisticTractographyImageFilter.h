@@ -86,9 +86,15 @@ public:
         ListType logParticleWeights, logNormalizedParticleWeights;
         ListType previousUpdateLogWeights;
         ListType logClassWeights;
-        std::vector <unsigned int> fiberNumberOfSegments;
+        std::vector <unsigned int> fiberNumberOfPoints;
         std::vector <bool> stoppedParticles;
     };
+
+    void AddGradientDirection(unsigned int i, Vector3DType &grad);
+    Vector3DType &GetDiffusionGradient(unsigned int i) {return m_DiffusionGradients[i];}
+    void SetBValuesList(ListType bValuesList) {m_BValuesList = bValuesList;}
+    ScalarType GetBValueItem(unsigned int i) {return m_BValuesList[i];}
+    unsigned int GetNumberOfGradientDirections() {return m_BValuesList.size();}
 
     virtual void SetInputModelImage(InputModelImageType *inImage) {m_InputModelImage = inImage;}
     InputModelImageType *GetInputModelImage() {return m_InputModelImage;}
@@ -171,10 +177,8 @@ protected:
                                                    DirectionVectorType &initialDirections);
 
     //! Make the particles move forward one step
-    void ProgressParticles(FiberWorkType &fiberComputationData, ContinuousIndexType &currentIndex, PointType &currentPoint,
-                           IndexType &closestIndex, ContinuousIndexType &newIndex, InterpolatorPointer &modelInterpolator,
-                           VectorType &modelValue, DirectionVectorType &previousDirections, Vector3DType &newDirection,
-                           unsigned int numThread);
+    void ProgressParticles(FiberWorkType &fiberComputationData, InterpolatorPointer &modelInterpolator,
+                           DirectionVectorType &previousDirections, unsigned int numThread);
 
     //! This guy takes the result of computefiber and merges the classes, each one becomes one fiber
     // Returns in outputMerged several fibers, as of now if there are active particles it returns only the merge of those, and returns true.
@@ -195,7 +199,8 @@ protected:
                                              unsigned int threadId) = 0;
 
     //! Update particle weight based on an underlying model and the chosen direction (model dependent, not implemented here)
-    virtual double ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &newDirection, VectorType &modelValue,
+    virtual double ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &previousDirection,
+                                          Vector3DType &newDirection, VectorType &previousModelValue, VectorType &modelValue,
                                           unsigned int threadId) = 0;
 
     //! Estimate model from raw diffusion data (model dependent, not implemented here)
@@ -209,6 +214,9 @@ private:
 
     //Internal variable for model vector dimension, has to be set by child class !
     unsigned int m_ModelDimension;
+
+    DirectionVectorType m_DiffusionGradients;
+    ListType m_BValuesList;
 
     unsigned int m_NumberOfParticles;
     unsigned int m_NumberOfFibersPerPixel;

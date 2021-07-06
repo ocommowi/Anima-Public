@@ -68,6 +68,19 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 template <class TInputModelImageType>
 void
 BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+::AddGradientDirection(unsigned int i, Vector3DType &grad)
+{
+    if (i == m_DiffusionGradients.size())
+        m_DiffusionGradients.push_back(grad);
+    else if (i > m_DiffusionGradients.size())
+        std::cerr << "Trying to add a direction not contiguous... Add directions contiguously (0,1,2,3,...)..." << std::endl;
+    else
+        m_DiffusionGradients[i] = grad;
+}
+
+template <class TInputModelImageType>
+void
+BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 ::Update()
 {
     this->PrepareTractography();
@@ -464,7 +477,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     fiberComputationData.stoppedParticles = std::vector <bool> (m_NumberOfParticles,false);
     fiberComputationData.classSizes = MembershipType(numberOfClasses,m_NumberOfParticles);
     fiberComputationData.logClassWeights = ListType(numberOfClasses, - std::log(numberOfClasses));
-    fiberComputationData.fiberNumberOfSegments = ListType(m_NumberOfParticles, 0);
+    fiberComputationData.fiberNumberOfPoints = std::vector <unsigned int> (m_NumberOfParticles, 1);
     //We need membership vectors in each direction
     fiberComputationData.classMemberships = MembershipType(m_NumberOfParticles,0);
     fiberComputationData.reverseClassMemberships.resize(numberOfClasses);
@@ -479,10 +492,8 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     DirectionVectorType previousDirectionsCopy;
 
     VectorType modelValue(m_ModelDimension);
-    Vector3DType newDirection;
     PointType currentPoint;
-    ContinuousIndexType currentIndex, newIndex;
-    IndexType closestIndex;
+    ContinuousIndexType currentIndex;
 
     // First check: is model right at start point?
     currentPoint = fiber.back();
@@ -500,15 +511,14 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
     // Perform the forward progression
     bool stopLoop = false;
-    unsigned int maxIterations = m_MaxLengthFiber / m_StepProgression;
+    unsigned int maxIterations = m_MaxLengthFiber / m_StepProgression + 1;
 
     while (!stopLoop)
     {
         logWeightSums.resize(numberOfClasses);
         std::fill(logWeightSums.begin(),logWeightSums.end(),0.0);
 
-        this->ProgressParticles(fiberComputationData,currentIndex,currentPoint,closestIndex,newIndex,modelInterpolator,
-                                modelValue,previousDirections,newDirection,numThread);
+        this->ProgressParticles(fiberComputationData,modelInterpolator,previousDirections,numThread);
 
         // Update weights
         this->UpdateWeightsFromCurrentData(fiberComputationData,logWeightSums);
@@ -528,7 +538,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
         stopLoop = true;
         for (unsigned int i = 0;i < m_NumberOfParticles;++i)
         {
-            if (fiberComputationData.fiberNumberOfSegments[i] == maxIterations)
+            if (fiberComputationData.fiberNumberOfPoints[i] == maxIterations)
                 fiberComputationData.stoppedParticles[i] = true;
 
             if (!fiberComputationData.stoppedParticles[i])
@@ -543,18 +553,22 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     stopLoop = true;
     FiberType invertedFiber;
     bool is2d = m_InputModelImage->GetLargestPossibleRegion().GetSize()[2] == 1;
+    VectorType previousModelValue(m_ModelDimension);
+    PointType previousPoint;
+    ContinuousIndexType previousIndex;
+    Vector3DType nullDirection(0.0), dummyDirection;
 
     for (unsigned int i = 0;i < m_NumberOfParticles;++i)
     {
         // Unstop particles
-        if (fiberComputationData.fiberNumberOfSegments[i] <= maxIterations)
+        if (fiberComputationData.fiberNumberOfPoints[i] <= maxIterations)
         {
             stopLoop = false;
             fiberComputationData.stoppedParticles[i] = false;
         }
 
         // Change fiber order, previous direction and log weight update
-        invertedFiber.resize(fiberComputationData.fiberNumberOfSegments[i]);
+        invertedFiber.resize(fiberComputationData.fiberNumberOfPoints[i]);
         FiberType::reverse_iterator fiberItr;
         unsigned int pos = 0;
         for (fiberItr = fiberComputationData.fiberParticles[i].rbegin(); fiberItr != fiberComputationData.fiberParticles[i].rend(); ++fiberItr)
@@ -565,15 +579,26 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
         fiberComputationData.fiberParticles[i] = invertedFiber;
 
-        currentPoint = fiberComputationData.fiberParticles[i].back();
+        unsigned int numPoints = fiberComputationData.fiberNumberOfPoints[i];
+        unsigned int lastIndex = numPoints - 1;
+        currentPoint = fiberComputationData.fiberParticles[i][lastIndex];
         m_SeedMask->TransformPhysicalPointToContinuousIndex(currentPoint,currentIndex);
         modelValue.Fill(0.0);
+        previousPoint = fiberComputationData.fiberParticles[i][lastIndex];
+        unsigned int oneToLastIndex = lastIndex;
+        if (lastIndex > 0)
+            oneToLastIndex = lastIndex - 1;
 
+        previousPoint = fiberComputationData.fiberParticles[i][oneToLastIndex];
+        m_SeedMask->TransformPhysicalPointToContinuousIndex(previousPoint,previousIndex);
+        previousModelValue.Fill(0.0);
+
+        this->ComputeModelValue(modelInterpolator, previousIndex, previousModelValue);
         this->ComputeModelValue(modelInterpolator, currentIndex, modelValue);
 
-        if (fiberComputationData.fiberNumberOfSegments[i] == 0)
+        if (fiberComputationData.fiberNumberOfPoints[i] <= 1)
         {
-            this->SampleDirectionFromModel(modelValue, previousDirections[i]);
+            previousDirections[i] = this->ProposeNewDirection(nullDirection, modelValue, m_Generators[numThread], numThread);
 
             if (previousDirections[i][1 + is2d] > 0)
                 previousDirections[i] *= -1;
@@ -582,14 +607,19 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
         }
         else
         {
-            unsigned int lastIndex = fiberComputationData.fiberNumberOfSegments[i] - 1;
-            previousDirections[i] = fiberComputationData.fiberParticles[i][lastIndex] - fiberComputationData.fiberParticles[i][lastIndex - 1];
+            previousDirections[i] = fiberComputationData.fiberParticles[i][lastIndex] - fiberComputationData.fiberParticles[i][oneToLastIndex];
             anima::Normalize(previousDirections[i],previousDirections[i]);
+
+            dummyDirection = previousDirections[i];
+            if (oneToLastIndex > 0)
+                dummyDirection = fiberComputationData.fiberParticles[i][oneToLastIndex] - fiberComputationData.fiberParticles[i][oneToLastIndex - 1];
+            anima::Normalize(dummyDirection,dummyDirection);
 
             estimatedB0Value = m_B0Interpolator->EvaluateAtContinuousIndex(currentIndex);
             estimatedNoiseValue = m_NoiseInterpolator->EvaluateAtContinuousIndex(currentIndex);
 
-            fiberComputationData.previousUpdateLogWeights[i] = this->ComputeLogWeightUpdate(estimatedB0Value, estimatedNoiseValue, previousDirections[i], modelValue, numThread);
+            fiberComputationData.previousUpdateLogWeights[i] = this->ComputeLogWeightUpdate(estimatedB0Value, estimatedNoiseValue, dummyDirection,
+                                                                                            previousDirections[i], previousModelValue, modelValue, numThread);
         }
     }
 
@@ -599,8 +629,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
         logWeightSums.resize(numberOfClasses);
         std::fill(logWeightSums.begin(),logWeightSums.end(),0.0);
 
-        this->ProgressParticles(fiberComputationData,currentIndex,currentPoint,closestIndex,newIndex,modelInterpolator,
-                                modelValue,previousDirections,newDirection,numThread);
+        this->ProgressParticles(fiberComputationData,modelInterpolator,previousDirections,numThread);
 
         // Update weights
         this->UpdateWeightsFromCurrentData(fiberComputationData,logWeightSums);
@@ -620,7 +649,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
         stopLoop = true;
         for (unsigned int i = 0;i < m_NumberOfParticles;++i)
         {
-            if (fiberComputationData.fiberNumberOfSegments[i] == maxIterations)
+            if (fiberComputationData.fiberNumberOfPoints[i] == maxIterations)
                 fiberComputationData.stoppedParticles[i] = true;
 
             if (!fiberComputationData.stoppedParticles[i])
@@ -659,15 +688,14 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
                                     DirectionVectorType &initialDirections)
 {
     initialDirections.resize(m_NumberOfParticles);
-    Vector3DType nullDirection(0.0), zDirection(0.0);
-    zDirection[2] = 1.0;
+    Vector3DType nullDirection(0.0);
     bool is2d = (m_InputModelImage->GetLargestPossibleRegion().GetSize()[2] == 1);
 
     for (unsigned int i = 0;i < m_NumberOfParticles;++i)
     {
         initialDirections[i] = this->ProposeNewDirection(nullDirection, modelValue, m_Generators[threadId], threadId);
 
-        if (anima::ComputeScalarProduct(zDirection,initialDirections[i]) < 0)
+        if (initialDirections[i][1 + is2d] < 0)
             initialDirections[i] *= -1.0;
 
         if (is2d)
@@ -681,12 +709,16 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 template <class TInputModelImageType>
 void
 BaseProbabilisticTractographyImageFilter <TInputModelImageType>
-::ProgressParticles(FiberWorkType &fiberComputationData, ContinuousIndexType &currentIndex, PointType &currentPoint,
-                    IndexType &closestIndex, ContinuousIndexType &newIndex, InterpolatorPointer &modelInterpolator,
-                    VectorType &modelValue, DirectionVectorType &previousDirections,
-                    Vector3DType &newDirection, unsigned int numThread)
+::ProgressParticles(FiberWorkType &fiberComputationData, InterpolatorPointer &modelInterpolator,
+                    DirectionVectorType &previousDirections, unsigned int numThread)
 {
     double estimatedNoiseValue = 20.0;
+    VectorType previousModelValue(m_ModelDimension);
+    ContinuousIndexType currentIndex, newIndex;
+    PointType currentPoint;
+    IndexType closestIndex;
+    VectorType modelValue(m_ModelDimension);
+    Vector3DType newDirection;
 
     for (unsigned int i = 0;i < m_NumberOfParticles;++i)
     {
@@ -738,8 +770,6 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
         // Propose a new direction based on the previous one and the diffusion information at current position
         newDirection = this->ProposeNewDirection(previousDirections[i], modelValue, m_Generators[numThread], numThread);
 
-        fiberComputationData.fiberNumberOfSegments[i]++;
-
         // Update the position of the particle
         for (unsigned int j = 0;j < InputModelImageType::ImageDimension;++j)
             currentPoint[j] += m_StepProgression * newDirection[j];
@@ -760,14 +790,16 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
         }
 
         fiberComputationData.fiberParticles[i].push_back(currentPoint);
+        fiberComputationData.fiberNumberOfPoints[i]++;
 
+        previousModelValue = modelValue;
         this->ComputeModelValue(modelInterpolator, newIndex, modelValue);
         estimatedB0Value = m_B0Interpolator->EvaluateAtContinuousIndex(newIndex);
         estimatedNoiseValue = m_NoiseInterpolator->EvaluateAtContinuousIndex(newIndex);
 
         // Update the weight of the particle
-        fiberComputationData.previousUpdateLogWeights[i] = this->ComputeLogWeightUpdate(estimatedB0Value, estimatedNoiseValue, newDirection,
-                                                                                        modelValue, numThread);
+        fiberComputationData.previousUpdateLogWeights[i] = this->ComputeLogWeightUpdate(estimatedB0Value, estimatedNoiseValue, previousDirections[i],
+                                                                                        newDirection, previousModelValue, modelValue, numThread);
 
         fiberComputationData.logParticleWeights[i] += fiberComputationData.previousUpdateLogWeights[i];
     }
@@ -805,6 +837,9 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
     for (unsigned int i = 0;i < numberOfClasses;++i)
         fiberComputationData.logClassWeights[i] = fiberComputationData.logClassWeights[i] + logWeightSums[i] - logSumClassWeights;
+
+    // For computational stability reasons, replace un-normalized weights by normalized ones at current step
+    fiberComputationData.logParticleWeights = fiberComputationData.logNormalizedParticleWeights;
 }
 
 template <class TInputModelImageType>
@@ -814,7 +849,9 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
                                       DirectionVectorType &previousDirectionsCopy, unsigned int numThread)
 {
     unsigned int numberOfClasses = fiberComputationData.classSizes.size();
-    ListType weightSpecificClassValues, fiberParticlesCopy, fiberStoppedCopy, previousUpdateLogWeightsCopy;
+    ListType weightSpecificClassValues, previousUpdateLogWeightsCopy;
+    FiberProcessVectorType fiberParticlesCopy;
+    std::vector <bool> fiberStoppedCopy;
     ListType tmpVector;
     std::vector <bool> usedFibers;
 
@@ -1028,7 +1065,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     // Compute average directions after fusion, directions contains the last directions taken by particles
     for (unsigned int i = 0;i < m_NumberOfParticles;++i)
     {
-        if (fiberData.particleWeights[i] == 0)
+        if (std::exp(fiberData.logNormalizedParticleWeights[i]) == 0)
             continue;
 
         unsigned int classIndex = classesFusion[fiberData.classMemberships[i]];
