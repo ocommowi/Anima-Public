@@ -52,7 +52,7 @@ int main(int argc,  char*  argv[])
     TCLAP::ValueArg<double> kappaThrArg("","kappa-thr","Kappa threshold for splitting clusters (default: 30)",false,30.0,"splitting threshold",cmd);
     TCLAP::ValueArg<unsigned int> clusterDistArg("","cluster-dist","Distance between clusters: choices are 0 (HD, default) or 1 (MHD)",false,0,"cluster distance",cmd);
 
-    TCLAP::SwitchArg averageClustersArg("M","average-clusters","Output only cluster mean",cmd,false);
+    TCLAP::SwitchArg noAverageClustersArg("M","no-cluster-averaging","Do not average clusters and output raw data (very large)",cmd,false);
     TCLAP::SwitchArg addLocalDataArg("L","local-data","Add local data information to output tracks",cmd);
 
     TCLAP::ValueArg<unsigned int> nbThreadsArg("T","nb-threads","Number of threads to run on (default: all available)",false,itk::MultiThreaderBase::GetGlobalDefaultNumberOfThreads(),"number of threads",cmd);
@@ -132,7 +132,7 @@ int main(int argc,  char*  argv[])
     
     bool computeLocalColors = (fibersArg.getValue().find(".fds") != std::string::npos) && (addLocalDataArg.isSet());
     odfTracker->SetComputeLocalColors(computeLocalColors);
-    odfTracker->SetMAPMergeFibers(averageClustersArg.getValue());
+    odfTracker->SetMAPMergeFibers(!noAverageClustersArg.getValue());
     
     itk::CStyleCommand::Pointer callback = itk::CStyleCommand::New();
     callback->SetCallback(eventCallback);
