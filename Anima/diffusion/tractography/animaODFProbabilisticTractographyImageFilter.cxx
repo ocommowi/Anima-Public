@@ -139,6 +139,13 @@ double ODFProbabilisticTractographyImageFilter::ComputeLogWeightUpdate(double b0
 
     for (unsigned int i = 0;i < numGradientImages;++i)
     {
+        double bvalue = this->GetBValueItem(i);
+        if (bvalue == 0)
+        {
+            log_likelihood -= 0.5 * (std::log(noiseValue) + std::log(2.0 * M_PI));
+            continue;
+        }
+
         gradient = this->GetDiffusionGradient(i);
         anima::TransformCartesianToSphericalCoordinates(gradient,sphDirection);
         double todSignal = m_ODFSHBasis->getValueAtPosition(todValue,sphDirection[0],sphDirection[1]);

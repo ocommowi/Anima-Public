@@ -50,8 +50,8 @@ int main(int argc,  char*  argv[])
     TCLAP::ValueArg<double> kappaPriorArg("k","kappa-prior","Kappa of prior distribution (default: 15)",false,15.0,"prior kappa",cmd);
     TCLAP::ValueArg<double> distThrArg("","dist-thr","Hausdorff distance threshold for mergine clusters (default: 0.5)",false,0.5,"merging threshold",cmd);
     TCLAP::ValueArg<double> kappaThrArg("","kappa-thr","Kappa threshold for splitting clusters (default: 30)",false,30.0,"splitting threshold",cmd);
-    TCLAP::ValueArg<unsigned int> clusterDistArg("","cluster-dist","Distance between clusters: choices are 0 (AHD), 1 (HD, default) or 2 (MHD)",false,1,"cluster distance",cmd);
-    
+    TCLAP::ValueArg<unsigned int> clusterDistArg("","cluster-dist","Distance between clusters: choices are 0 (HD, default) or 1 (MHD)",false,0,"cluster distance",cmd);
+
     TCLAP::SwitchArg averageClustersArg("M","average-clusters","Output only cluster mean",cmd,false);
     TCLAP::SwitchArg addLocalDataArg("L","local-data","Add local data information to output tracks",cmd);
 

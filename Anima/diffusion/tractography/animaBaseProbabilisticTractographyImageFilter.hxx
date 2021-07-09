@@ -46,7 +46,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
     m_PositionDistanceFuseThreshold = 0.5;
     m_KappaSplitThreshold = 30.0;
 
-    m_ClusterDistance = 1;
+    m_ClusterDistance = 0;
 
     m_ComputeLocalColors = true;
     m_MAPMergeFibers = true;
@@ -954,25 +954,6 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
                 {
                     case 0:
                     {
-                        // Former method (quickest)
-                        unsigned int minSizeFiber = std::min(mapMergedFibersRef[0].size(),mapMergedFibersFlo[0].size());
-
-                        for (unsigned int l = 0;l < minSizeFiber;++l)
-                        {
-                            double positionDist = anima::ComputeEuclideanDistance(mapMergedFibersRef[0][l], mapMergedFibersFlo[0][l]);
-
-                            if (positionDist > maxVal)
-                                maxVal = positionDist;
-
-                            if (maxVal > m_PositionDistanceFuseThreshold)
-                                break;
-                        }
-
-                        break;
-                    }
-
-                    case 1:
-                    {
                         // Hausdorff distance
                         for (unsigned int l = 0;l < mapMergedFibersRef[0].size();++l)
                         {
@@ -1002,7 +983,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
                         break;
                     }
 
-                    case 2:
+                    case 1:
                     {
                         // Modified Hausdorff distance
                         maxVal = anima::ComputeModifiedDirectedHausdorffDistance(mapMergedFibersRef[0], mapMergedFibersFlo[0]);
