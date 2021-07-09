@@ -96,7 +96,7 @@ protected:
     virtual PointType GetNextDirection(PointType &previousDirection, VectorType &modelValue, bool is2d, itk::ThreadIdType threadId) = 0;
 
     //! Computes new fiber point using Runge Kutta integration (better spread of fibers than Euler integration)
-    virtual void ComputeNewFiberPoint(PointType &oldPoint, PointType &newDirection, PointType &newPoint, itk::ThreadIdType threadId);
+    virtual void ComputeNewFiberPoint(PointType &oldPoint, PointType &oldDirection, PointType &newDirection, PointType &newPoint, itk::ThreadIdType threadId);
 
     virtual void ComputeAdditionalScalarMaps() {}
     bool isZero(VectorType &value);

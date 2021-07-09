@@ -210,6 +210,9 @@ void BaseTractographyImageFilter::ThreadedTrackComputer(unsigned int numThread, 
     IndexType curNearestIndex;
     PointType initialPoint;
 
+    PointType oldDir;
+    oldDir.Fill(0.0);
+
     for (unsigned int i = startSeedIndex;i < endSeedIndex;++i)
     {
         bool treatPoint = true;
@@ -238,7 +241,7 @@ void BaseTractographyImageFilter::ThreadedTrackComputer(unsigned int numThread, 
         if (!treatPoint)
             continue;
 
-        this->GetModelValue(curIndex, modelValue);
+        this->GetModelValue(curIndex, oldDir, modelValue);
         if (isZero(modelValue))
             treatPoint = false;
 
@@ -369,7 +372,7 @@ BaseTractographyImageFilter::ComputeFiber(BaseTractographyImageFilter::FiberType
             break;
         }
 
-        this->ComputeNewFiberPoint(fiber[fiber.size() - 1],newDir,curPoint,threadId);
+        this->ComputeNewFiberPoint(fiber[fiber.size() - 1],oldDir,newDir,curPoint,threadId);
 
         m_SeedingImage->TransformPhysicalPointToContinuousIndex(curPoint,curIndex);
         m_SeedingImage->TransformPhysicalPointToIndex(curPoint,curNearestIndex);
@@ -445,7 +448,7 @@ BaseTractographyImageFilter::ComputeFiber(BaseTractographyImageFilter::FiberType
             break;
         }
 
-        this->ComputeNewFiberPoint(fiber[0],newDir,curPoint,threadId);
+        this->ComputeNewFiberPoint(fiber[0],oldDir,newDir,curPoint,threadId);
 
         m_SeedingImage->TransformPhysicalPointToContinuousIndex(curPoint,curIndex);
         m_SeedingImage->TransformPhysicalPointToIndex(curPoint,curNearestIndex);
@@ -497,7 +500,7 @@ BaseTractographyImageFilter::ComputeFiber(BaseTractographyImageFilter::FiberType
     }
 }
 
-void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, PointType &newDirection, PointType &newPoint,
+void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, PointType &oldDirection, PointType &newDirection, PointType &newPoint,
                                                        itk::ThreadIdType threadId)
 {
     PointType k1, k2, k3, k4;
@@ -522,7 +525,7 @@ void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, Poin
         return;
     }
 
-    this->GetModelValue(curIndex,oldDir,modelValue);
+    this->GetModelValue(curIndex,oldDirection,modelValue);
     if (isZero(modelValue))
     {
         for (unsigned int i = 0;i < 3;++i)
@@ -544,7 +547,7 @@ void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, Poin
         return;
     }
 
-    this->GetModelValue(curIndex,oldDir,modelValue);
+    this->GetModelValue(curIndex,oldDirection,modelValue);
     if (isZero(modelValue))
     {
         for (unsigned int i = 0;i < 3;++i)
@@ -566,7 +569,7 @@ void BaseTractographyImageFilter::ComputeNewFiberPoint(PointType &oldPoint, Poin
         return;
     }
 
-    this->GetModelValue(curIndex,oldDir,modelValue);
+    this->GetModelValue(curIndex,oldDirection,modelValue);
     if (isZero(modelValue))
     {
         for (unsigned int i = 0;i < 3;++i)
