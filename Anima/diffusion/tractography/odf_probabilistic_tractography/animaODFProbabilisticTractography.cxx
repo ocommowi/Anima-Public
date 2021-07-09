@@ -5,11 +5,10 @@
 #include <tclap/CmdLine.h>
 
 #include <animaReadWriteFunctions.h>
-#include <animaLogTensorImageFilter.h>
+#include <animaGradientFileReader.h>
+#include <animaShapesWriter.h>
 
 #include <itkCommand.h>
-
-#include <animaShapesWriter.h>
 
 //Update progression of the process
 void eventCallback (itk::Object* caller, const itk::EventObject& event, void* clientData)
@@ -29,14 +28,10 @@ int main(int argc,  char*  argv[])
     TCLAP::ValueArg<std::string> b0Arg("b","b0","B0 image",true,"","b0 image",cmd);
     TCLAP::ValueArg<std::string> noiseArg("N","noise","Noise image",true,"","noise image",cmd);
 
-    TCLAP::ValueArg<int> colinearityModeArg("","col-init-mode",
-                                            "Colinearity mode for initialization - 0: center, 1: outward, 2: top, 3: bottom, 4: left, 5: right, 6: front, 7: back (default: 0)",
-                                            false,0,"colinearity mode for initialization",cmd);
-    TCLAP::ValueArg<int> initialDirectionModeArg("","init-mode",
-                                                 "Mode for initialization - 0: take most colinear direction, 1: take highest weighted direction (default: 1)",
-                                                 false,1,"mode for initialization",cmd);
+    TCLAP::ValueArg<std::string> gradientsArg("g","gradients","Gradient table",true,"","gradients",cmd);
+    TCLAP::ValueArg<std::string> bvaluesArg("b","bvalues","B-value list",true,"","b-values",cmd);
 
-    // Optional mask arguments
+    // Optional arguments
     TCLAP::ValueArg<std::string> cutMaskArg("c","cut-mask","Mask for cutting fibers (default: none)",false,"","cut mask",cmd);
     TCLAP::ValueArg<std::string> forbiddenMaskArg("f","forbidden-mask","Mask for removing fibers (default: none)",false,"","remove mask",cmd);
     TCLAP::ValueArg<std::string> filterMaskArg("","filter-mask","Mask for filtering fibers (default: none)",false,"","filter mask",cmd);
@@ -52,15 +47,9 @@ int main(int argc,  char*  argv[])
     TCLAP::ValueArg<unsigned int> clusterMinSizeArg("","cluster-min-size","Minimal number of particles per cluster before split (default: 10)",false,10,"minimal cluster size",cmd);
 
     TCLAP::ValueArg<double> resampThrArg("r","resamp-thr","Resampling relative threshold (default: 0.8)",false,0.8,"resampling threshold",cmd);
-
-    TCLAP::ValueArg<double> minDiffProbaArg("","mdp","Minimal diffusion probability for an ODF direction to be kept (default: 0.02",false,0.01,"Minimal diffusion probability for an ODF direction",cmd);
-    TCLAP::ValueArg<double> trashThrArg("","trash-thr","Relative threshold to keep fibers in trash (default: 0.1)",false,0.1,"trash threshold",cmd);
     TCLAP::ValueArg<double> kappaPriorArg("k","kappa-prior","Kappa of prior distribution (default: 15)",false,15.0,"prior kappa",cmd);
-    TCLAP::ValueArg<double> curvScaleArg("","cs","Scale for ODF curvature to get vMF kappa (default: 6)",false,6.0,"scale for ODF curvature",cmd);
-
     TCLAP::ValueArg<double> distThrArg("","dist-thr","Hausdorff distance threshold for mergine clusters (default: 0.5)",false,0.5,"merging threshold",cmd);
     TCLAP::ValueArg<double> kappaThrArg("","kappa-thr","Kappa threshold for splitting clusters (default: 30)",false,30.0,"splitting threshold",cmd);
-
     TCLAP::ValueArg<unsigned int> clusterDistArg("","cluster-dist","Distance between clusters: choices are 0 (AHD), 1 (HD, default) or 2 (MHD)",false,1,"cluster distance",cmd);
 
     TCLAP::SwitchArg averageClustersArg("M","average-clusters","Output only cluster mean",cmd,false);
@@ -75,7 +64,7 @@ int main(int argc,  char*  argv[])
     catch (TCLAP::ArgException& e)
     {
         std::cerr << "Error: " << e.error() << "for argument " << e.argId() << std::endl;
-        return(1);
+        return EXIT_FAILURE;
     }
     
     typedef anima::ODFProbabilisticTractographyImageFilter MainFilterType;
@@ -88,8 +77,24 @@ int main(int argc,  char*  argv[])
     odfTracker->SetNumberOfWorkUnits(nbThreadsArg.getValue());
     odfTracker->SetInputModelImage(anima::readImage <InputModelImageType> (odfArg.getValue()));
 
-    odfTracker->SetInitialColinearityDirection((MainFilterType::ColinearityDirectionType)colinearityModeArg.getValue());
-    odfTracker->SetInitialDirectionMode((MainFilterType::InitialDirectionModeType)initialDirectionModeArg.getValue());
+    // Load gradient table and b-value list
+    std::cout << "Importing gradient table and corresponding b-values..." << std::endl;
+
+    typedef anima::GradientFileReader < Vector3DType, double > GFReaderType;
+    GFReaderType gfReader;
+    gfReader.SetGradientFileName(gradientsArg.getValue());
+    gfReader.SetBValueBaseString(bvaluesArg.getValue());
+    gfReader.SetGradientIndependentNormalization(false);
+    gfReader.Update();
+
+    GFReaderType::GradientVectorType directions = gfReader.GetGradients();
+
+    for(unsigned int i = 0;i < directions.size();++i)
+        odfTracker->AddGradientDirection(i,directions[i]);
+
+    GFReaderType::BValueVectorType mb = gfReader.GetBValues();
+
+    odfTracker->SetBValuesList(mb);
 
     // Load seed mask
     odfTracker->SetSeedMask(anima::readImage <MaskImageType> (seedMaskArg.getValue()));
@@ -119,15 +124,11 @@ int main(int argc,  char*  argv[])
     odfTracker->SetNumberOfParticles(nbParticlesArg.getValue());
     odfTracker->SetMinimalNumberOfParticlesPerClass(clusterMinSizeArg.getValue());
     odfTracker->SetResamplingThreshold(resampThrArg.getValue());
-    odfTracker->SetFiberTrashThreshold(trashThrArg.getValue());
-    
-    odfTracker->SetMinimalDiffusionProbability(minDiffProbaArg.getValue());
     odfTracker->SetKappaOfPriorDistribution(kappaPriorArg.getValue());
     
     odfTracker->SetPositionDistanceFuseThreshold(distThrArg.getValue());
     odfTracker->SetKappaSplitThreshold(kappaThrArg.getValue());
     odfTracker->SetClusterDistance(clusterDistArg.getValue());
-    odfTracker->SetCurvatureScale(curvScaleArg.getValue());
     
     bool computeLocalColors = (fibersArg.getValue().find(".fds") != std::string::npos) && (addLocalDataArg.isSet());
     odfTracker->SetComputeLocalColors(computeLocalColors);

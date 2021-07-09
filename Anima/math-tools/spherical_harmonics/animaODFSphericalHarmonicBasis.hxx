@@ -287,10 +287,10 @@ getAbsoluteUpperBound(const T &coefficients)
     return resVal;
 }
 
-template <class T>
+template <class T1, class T2>
 void
 ODFSphericalHarmonicBasis::
-getDirectionSampleFromODF(const T &coefficients, T &outputDirection, std::mt19937 &generator)
+getDirectionSampleFromODF(const T1 &coefficients, T2 &outputDirection, std::mt19937 &generator)
 {
     std::uniform_real_distribution<double> uniDbl(0.0,1.0);
     double upperBound = this->getAbsoluteUpperBound(coefficients);

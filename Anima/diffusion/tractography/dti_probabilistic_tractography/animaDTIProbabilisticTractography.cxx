@@ -135,7 +135,6 @@ int main(int argc,  char*  argv[])
     
     dtiTracker->SetPositionDistanceFuseThreshold(distThrArg.getValue());
     dtiTracker->SetKappaSplitThreshold(kappaThrArg.getValue());
-    
     dtiTracker->SetClusterDistance(clusterDistArg.getValue());
     
     bool computeLocalColors = (fibersArg.getValue().find(".fds") != std::string::npos) && (addLocalDataArg.isSet());

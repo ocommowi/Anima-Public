@@ -40,8 +40,8 @@ public:
 
     template <class T> double getAbsoluteUpperBound(const T &coefficients);
 
-    template <class T> void getDirectionSampleFromODF(const T &coefficients, T &outputDirection,
-                                                      std::mt19937 &generator);
+    template <class T1, class T2> void getDirectionSampleFromODF(const T1 &coefficients, T2 &outputDirection,
+                                                                 std::mt19937 &generator);
 
     double getNthSHValueAtPosition(int k, int m, double theta, double phi);
 
