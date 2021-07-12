@@ -1,6 +1,6 @@
 if(BUILD_TOOLS)
 
-project(animaDTIProbabilisticTractography)
+project(animaODFParticleFilteringTractography)
 
 ## #############################################################################
 ## List Sources
@@ -25,8 +25,9 @@ add_executable(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
   ${ITKIO_LIBRARIES}
-  ${TinyXML2_LIBRARY}
   AnimaTractography
+  ${TinyXML2_LIBRARY}
+  ${VTK_PREFIX}IOLegacy
   )
 
 ## #############################################################################
