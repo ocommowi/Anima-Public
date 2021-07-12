@@ -1,7 +1,7 @@
 #pragma once
 
 #include <itkVectorImage.h>
-#include <animaBaseProbabilisticTractographyImageFilter.h>
+#include <animaBaseParticleFilteringTractographyImageFilter.h>
 
 #include <random>
 
@@ -10,24 +10,24 @@
 namespace anima
 {
 
-class ANIMATRACTOGRAPHY_EXPORT DTIProbabilisticTractographyImageFilter : public BaseProbabilisticTractographyImageFilter < itk::VectorImage <double, 3> >
+class ANIMATRACTOGRAPHY_EXPORT DTIParticleFilteringTractographyImageFilter : public BaseParticleFilteringTractographyImageFilter < itk::VectorImage <double, 3> >
 {
 public:
     /** SmartPointer typedef support  */
-    typedef DTIProbabilisticTractographyImageFilter Self;
-    typedef BaseProbabilisticTractographyImageFilter < itk::VectorImage <double, 3> > Superclass;
+    typedef DTIParticleFilteringTractographyImageFilter Self;
+    typedef BaseParticleFilteringTractographyImageFilter < itk::VectorImage <double, 3> > Superclass;
 
     typedef itk::SmartPointer<Self> Pointer;
     typedef itk::SmartPointer<const Self> ConstPointer;
 
     itkNewMacro(Self)
-    itkTypeMacro(DTIProbabilisticTractographyImageFilter,BaseProbabilisticTractographyImageFilter)
+    itkTypeMacro(DTIParticleFilteringTractographyImageFilter,BaseParticleFilteringTractographyImageFilter)
 
     itkSetMacro(FAThreshold,double)
 
 protected:
-    DTIProbabilisticTractographyImageFilter();
-    virtual ~DTIProbabilisticTractographyImageFilter();
+    DTIParticleFilteringTractographyImageFilter();
+    virtual ~DTIParticleFilteringTractographyImageFilter();
 
     virtual Vector3DType ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
                                              std::mt19937 &random_generator, unsigned int threadId) ITK_OVERRIDE;
@@ -45,7 +45,7 @@ protected:
     void ComputeAdditionalScalarMaps() ITK_OVERRIDE;
 
 private:
-    ITK_DISALLOW_COPY_AND_ASSIGN(DTIProbabilisticTractographyImageFilter);
+    ITK_DISALLOW_COPY_AND_ASSIGN(DTIParticleFilteringTractographyImageFilter);
 
     double m_FAThreshold;
 };

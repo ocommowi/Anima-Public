@@ -17,17 +17,17 @@ namespace anima
 {
 
 template <class TInputModelImageType>
-class BaseProbabilisticTractographyImageFilter : public itk::ProcessObject
+class BaseParticleFilteringTractographyImageFilter : public itk::ProcessObject
 {
 public:
     /** SmartPointer typedef support  */
-    typedef BaseProbabilisticTractographyImageFilter Self;
+    typedef BaseParticleFilteringTractographyImageFilter Self;
     typedef itk::ProcessObject Superclass;
 
     typedef itk::SmartPointer<Self> Pointer;
     typedef itk::SmartPointer<const Self> ConstPointer;
 
-    itkTypeMacro(BaseProbabilisticTractographyImageFilter,itk::ProcessObject)
+    itkTypeMacro(BaseParticleFilteringTractographyImageFilter,itk::ProcessObject)
 
     // Typdefs for scalar types for reading/writing images and for math operations
     typedef double ScalarType;
@@ -66,7 +66,7 @@ public:
     typedef std::vector <unsigned int> MembershipType;
 
     typedef struct {
-        BaseProbabilisticTractographyImageFilter *trackerPtr;
+        BaseParticleFilteringTractographyImageFilter *trackerPtr;
         std::vector <FiberProcessVectorType> resultFibersFromThreads;
         std::vector <ListType> resultWeightsFromThreads;
     } trackerArguments;
@@ -141,8 +141,8 @@ public:
     vtkPolyData *GetOutput() {return m_Output;}
 
 protected:
-    BaseProbabilisticTractographyImageFilter();
-    virtual ~BaseProbabilisticTractographyImageFilter();
+    BaseParticleFilteringTractographyImageFilter();
+    virtual ~BaseParticleFilteringTractographyImageFilter();
 
     //! Multithread util function
     static ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION ThreadTracker(void *arg);
@@ -210,7 +210,7 @@ protected:
     virtual bool CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId) = 0;
 
 private:
-    ITK_DISALLOW_COPY_AND_ASSIGN(BaseProbabilisticTractographyImageFilter);
+    ITK_DISALLOW_COPY_AND_ASSIGN(BaseParticleFilteringTractographyImageFilter);
 
     //Internal variable for model vector dimension, has to be set by child class !
     unsigned int m_ModelDimension;
@@ -266,4 +266,4 @@ private:
 
 }//end of namesapce
 
-#include "animaBaseProbabilisticTractographyImageFilter.hxx"
+#include "animaBaseParticleFilteringTractographyImageFilter.hxx"

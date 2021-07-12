@@ -1,4 +1,4 @@
-#include <animaODFProbabilisticTractographyImageFilter.h>
+#include <animaODFParticleFilteringTractographyImageFilter.h>
 #include <animaGradientFileReader.h>
 #include <itkTimeProbe.h>
 
@@ -67,7 +67,7 @@ int main(int argc,  char*  argv[])
         return EXIT_FAILURE;
     }
     
-    typedef anima::ODFProbabilisticTractographyImageFilter MainFilterType;
+    typedef anima::ODFParticleFilteringTractographyImageFilter MainFilterType;
     typedef MainFilterType::InputModelImageType InputModelImageType;
     typedef MainFilterType::MaskImageType MaskImageType;
     typedef MainFilterType::Vector3DType Vector3DType;

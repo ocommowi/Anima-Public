@@ -1,4 +1,4 @@
-#include "animaBaseProbabilisticTractographyImageFilter.h"
+#include "animaBaseParticleFilteringTractographyImageFilter.h"
 
 #include <itkImageRegionIteratorWithIndex.h>
 #include <itkLinearInterpolateImageFunction.h>
@@ -25,8 +25,8 @@ namespace anima
 {
 
 template <class TInputModelImageType>
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
-::BaseProbabilisticTractographyImageFilter()
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
+::BaseParticleFilteringTractographyImageFilter()
 {
     m_PointsToProcess.clear();
 
@@ -58,8 +58,8 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 }
 
 template <class TInputModelImageType>
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
-::~BaseProbabilisticTractographyImageFilter()
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
+::~BaseParticleFilteringTractographyImageFilter()
 {
     if (m_ProgressReport)
         delete m_ProgressReport;
@@ -67,7 +67,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::AddGradientDirection(unsigned int i, Vector3DType &grad)
 {
     if (i == m_DiffusionGradients.size())
@@ -80,7 +80,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::Update()
 {
     this->PrepareTractography();
@@ -129,7 +129,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::PrepareTractography()
 {
     if (!m_B0Image)
@@ -247,8 +247,8 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 }
 
 template <class TInputModelImageType>
-typename BaseProbabilisticTractographyImageFilter <TInputModelImageType>::InterpolatorType *
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>::GetModelInterpolator()
+typename BaseParticleFilteringTractographyImageFilter <TInputModelImageType>::InterpolatorType *
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>::GetModelInterpolator()
 {
     typedef itk::LinearInterpolateImageFunction <InputModelImageType> InternalInterpolatorType;
 
@@ -261,7 +261,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>::GetModelInterpo
 
 template <class TInputModelImageType>
 ITK_THREAD_RETURN_FUNCTION_CALL_CONVENTION
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::ThreadTracker(void *arg)
 {
     itk::MultiThreaderBase::WorkUnitInfo *threadArgs = (itk::MultiThreaderBase::WorkUnitInfo *)arg;
@@ -275,7 +275,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::ThreadTrack(unsigned int numThread, FiberProcessVectorType &resultFibers,
               ListType &resultWeights)
 {
@@ -316,7 +316,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::ThreadedTrackComputer(unsigned int numThread, FiberProcessVectorType &resultFibers,
                         ListType &resultWeights, unsigned int startSeedIndex,
                         unsigned int endSeedIndex)
@@ -346,8 +346,8 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 }
 
 template <class TInputModelImageType>
-typename BaseProbabilisticTractographyImageFilter <TInputModelImageType>::FiberProcessVectorType
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+typename BaseParticleFilteringTractographyImageFilter <TInputModelImageType>::FiberProcessVectorType
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::FilterOutputFibers(FiberProcessVectorType &fibers, ListType &weights)
 {
     FiberProcessVectorType resVal;
@@ -423,7 +423,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::createVTKOutput(FiberProcessVectorType &filteredFibers, ListType &filteredWeights)
 {
     m_Output = vtkPolyData::New();
@@ -459,8 +459,8 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 }
 
 template <class TInputModelImageType>
-typename BaseProbabilisticTractographyImageFilter <TInputModelImageType>::FiberProcessVectorType
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+typename BaseParticleFilteringTractographyImageFilter <TInputModelImageType>::FiberProcessVectorType
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::ComputeFiber(FiberType &fiber, InterpolatorPointer &modelInterpolator,
                unsigned int numThread, ListType &resultWeights)
 {
@@ -683,7 +683,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::InitializeFirstIterationFromModel(VectorType &modelValue, unsigned int threadId,
                                     DirectionVectorType &initialDirections)
 {
@@ -708,7 +708,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::ProgressParticles(FiberWorkType &fiberComputationData, InterpolatorPointer &modelInterpolator,
                     DirectionVectorType &previousDirections, unsigned int numThread)
 {
@@ -807,7 +807,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::UpdateWeightsFromCurrentData(FiberWorkType &fiberComputationData, ListType &logWeightSums)
 {
     ListType tmpVector;
@@ -844,7 +844,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 void
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::CheckAndPerformOccasionalResampling(FiberWorkType &fiberComputationData, DirectionVectorType &previousDirections,
                                       DirectionVectorType &previousDirectionsCopy, unsigned int numThread)
 {
@@ -912,7 +912,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 unsigned int
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::UpdateClassesMemberships(FiberWorkType &fiberData, DirectionVectorType &directions, std::mt19937 &random_generator)
 {
     const unsigned int p = PointType::PointDimension;
@@ -952,12 +952,25 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
                 // Compute a distance between the two clusters, based on user input
                 switch (m_ClusterDistance)
                 {
-                    case 0:
+                case 0:
+                {
+                    // Hausdorff distance
+                    for (unsigned int l = 0;l < mapMergedFibersRef[0].size();++l)
                     {
-                        // Hausdorff distance
-                        for (unsigned int l = 0;l < mapMergedFibersRef[0].size();++l)
+                        double tmpVal = anima::ComputePointToSetDistance(mapMergedFibersRef[0][l], mapMergedFibersFlo[0]);
+
+                        if (tmpVal > maxVal)
+                            maxVal = tmpVal;
+
+                        if (maxVal > m_PositionDistanceFuseThreshold)
+                            break;
+                    }
+
+                    if (maxVal <= m_PositionDistanceFuseThreshold)
+                    {
+                        for (unsigned int l = 0;l < mapMergedFibersFlo[0].size();++l)
                         {
-                            double tmpVal = anima::ComputePointToSetDistance(mapMergedFibersRef[0][l], mapMergedFibersFlo[0]);
+                            double tmpVal = anima::ComputePointToSetDistance(mapMergedFibersFlo[0][l], mapMergedFibersRef[0]);
 
                             if (tmpVal > maxVal)
                                 maxVal = tmpVal;
@@ -965,37 +978,24 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
                             if (maxVal > m_PositionDistanceFuseThreshold)
                                 break;
                         }
-
-                        if (maxVal <= m_PositionDistanceFuseThreshold)
-                        {
-                            for (unsigned int l = 0;l < mapMergedFibersFlo[0].size();++l)
-                            {
-                                double tmpVal = anima::ComputePointToSetDistance(mapMergedFibersFlo[0][l], mapMergedFibersRef[0]);
-
-                                if (tmpVal > maxVal)
-                                    maxVal = tmpVal;
-
-                                if (maxVal > m_PositionDistanceFuseThreshold)
-                                    break;
-                            }
-                        }
-
-                        break;
                     }
 
-                    case 1:
-                    {
-                        // Modified Hausdorff distance
-                        maxVal = anima::ComputeModifiedDirectedHausdorffDistance(mapMergedFibersRef[0], mapMergedFibersFlo[0]);
+                    break;
+                }
 
-                        if (maxVal <= m_PositionDistanceFuseThreshold)
-                            maxVal = std::max(maxVal, anima::ComputeModifiedDirectedHausdorffDistance(mapMergedFibersFlo[0], mapMergedFibersRef[0]));
+                case 1:
+                {
+                    // Modified Hausdorff distance
+                    maxVal = anima::ComputeModifiedDirectedHausdorffDistance(mapMergedFibersRef[0], mapMergedFibersFlo[0]);
 
-                        break;
-                    }
+                    if (maxVal <= m_PositionDistanceFuseThreshold)
+                        maxVal = std::max(maxVal, anima::ComputeModifiedDirectedHausdorffDistance(mapMergedFibersFlo[0], mapMergedFibersRef[0]));
 
-                    default:
-                        break;
+                    break;
+                }
+
+                default:
+                    break;
                 }
 
                 // If computed distance is smaller than a threshold, we fuse
@@ -1260,7 +1260,7 @@ BaseProbabilisticTractographyImageFilter <TInputModelImageType>
 
 template <class TInputModelImageType>
 bool
-BaseProbabilisticTractographyImageFilter <TInputModelImageType>
+BaseParticleFilteringTractographyImageFilter <TInputModelImageType>
 ::MergeParticleClassFibers(FiberWorkType &fiberData, FiberProcessVectorType &outputMerged, unsigned int classNumber)
 {
     unsigned int numClasses = fiberData.classSizes.size();

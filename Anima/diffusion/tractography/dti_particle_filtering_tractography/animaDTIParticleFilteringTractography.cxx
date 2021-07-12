@@ -1,4 +1,4 @@
-#include <animaDTIProbabilisticTractographyImageFilter.h>
+#include <animaDTIParticleFilteringTractographyImageFilter.h>
 #include <itkTimeProbe.h>
 
 #include <tclap/CmdLine.h>
@@ -67,7 +67,7 @@ int main(int argc,  char*  argv[])
         return EXIT_FAILURE;
     }
 
-    typedef anima::DTIProbabilisticTractographyImageFilter MainFilterType;
+    typedef anima::DTIParticleFilteringTractographyImageFilter MainFilterType;
     typedef MainFilterType::InputModelImageType InputModelImageType;
     typedef MainFilterType::MaskImageType MaskImageType;
     typedef MainFilterType::Vector3DType Vector3DType;

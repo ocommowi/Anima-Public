@@ -1,4 +1,4 @@
-#include "animaDTIProbabilisticTractographyImageFilter.h"
+#include "animaDTIParticleFilteringTractographyImageFilter.h"
 #include <cmath>
 
 #include <animaVectorOperations.h>
@@ -16,21 +16,21 @@
 namespace anima
 {
 
-DTIProbabilisticTractographyImageFilter::DTIProbabilisticTractographyImageFilter()
-: BaseProbabilisticTractographyImageFilter()
+DTIParticleFilteringTractographyImageFilter::DTIParticleFilteringTractographyImageFilter()
+    : BaseParticleFilteringTractographyImageFilter()
 {
     m_FAThreshold = 0.2;
     
     this->SetModelDimension(6);
 }
 
-DTIProbabilisticTractographyImageFilter::~DTIProbabilisticTractographyImageFilter()
+DTIParticleFilteringTractographyImageFilter::~DTIParticleFilteringTractographyImageFilter()
 {
 }
 
-DTIProbabilisticTractographyImageFilter::Vector3DType
-DTIProbabilisticTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
-                                                             std::mt19937 &random_generator, unsigned int threadId)
+DTIParticleFilteringTractographyImageFilter::Vector3DType
+DTIParticleFilteringTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
+                                                                 std::mt19937 &random_generator, unsigned int threadId)
 {
     Vector3DType meanVec(0.0), resVec(0.0);
     vnl_matrix <double> tensor(3,3);
@@ -51,7 +51,7 @@ DTIProbabilisticTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDi
     return resVec;
 }
 
-bool DTIProbabilisticTractographyImageFilter::CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId)
+bool DTIParticleFilteringTractographyImageFilter::CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId)
 {
     if (estimatedB0Value < 50.0)
         return false;
@@ -76,12 +76,12 @@ bool DTIProbabilisticTractographyImageFilter::CheckModelProperties(double estima
     return true;
 }
 
-double DTIProbabilisticTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &previousDirection,
-                                                                       Vector3DType &newDirection, VectorType &previousModelValue, VectorType &modelValue,
-                                                                       unsigned int threadId)
+double DTIParticleFilteringTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &previousDirection,
+                                                                           Vector3DType &newDirection, VectorType &previousModelValue, VectorType &modelValue,
+                                                                           unsigned int threadId)
 {
     bool is2d = this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] <= 1;
-        
+
     // Prior is a Watson PDF
     double log_prior = anima::safe_log(anima::EvaluateWatsonPDF(newDirection, previousDirection, this->GetKappaOfPriorDistribution()));
 
@@ -169,8 +169,8 @@ double DTIProbabilisticTractographyImageFilter::ComputeLogWeightUpdate(double b0
     return resVal;
 }
 
-void DTIProbabilisticTractographyImageFilter::ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index,
-                                                                VectorType &modelValue)
+void DTIParticleFilteringTractographyImageFilter::ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index,
+                                                                    VectorType &modelValue)
 {
     modelValue.SetSize(this->GetModelDimension());
     modelValue.Fill(0.0);
@@ -189,7 +189,7 @@ void DTIProbabilisticTractographyImageFilter::ComputeModelValue(InterpolatorPoin
     anima::GetVectorRepresentation(tmpTensor,modelValue);
 }
 
-double DTIProbabilisticTractographyImageFilter::GetFractionalAnisotropy(VectorType &modelValue)
+double DTIParticleFilteringTractographyImageFilter::GetFractionalAnisotropy(VectorType &modelValue)
 {
     itk::SymmetricEigenAnalysis <Matrix3DType,Vector3DType,Matrix3DType> EigenAnalysis(InputModelImageType::ImageDimension);
     EigenAnalysis.SetOrderEigenValues(true);
@@ -227,7 +227,7 @@ double DTIProbabilisticTractographyImageFilter::GetFractionalAnisotropy(VectorTy
     return std::sqrt(3.0 * num / (2.0 * denom));
 }
 
-void DTIProbabilisticTractographyImageFilter::ComputeAdditionalScalarMaps()
+void DTIParticleFilteringTractographyImageFilter::ComputeAdditionalScalarMaps()
 {
     vtkSmartPointer <vtkPolyData> outputPtr = this->GetOutput();
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <itkVectorImage.h>
-#include <animaBaseProbabilisticTractographyImageFilter.h>
+#include <animaBaseParticleFilteringTractographyImageFilter.h>
 #include <animaODFSphericalHarmonicBasis.h>
 
 #include "AnimaTractographyExport.h"
@@ -9,26 +9,26 @@
 namespace anima
 {
 
-class ANIMATRACTOGRAPHY_EXPORT ODFProbabilisticTractographyImageFilter : public anima::BaseProbabilisticTractographyImageFilter < itk::VectorImage <double, 3> >
+class ANIMATRACTOGRAPHY_EXPORT ODFParticleFilteringTractographyImageFilter : public anima::BaseParticleFilteringTractographyImageFilter < itk::VectorImage <double, 3> >
 {
 public:
     /** SmartPointer typedef support  */
-    typedef ODFProbabilisticTractographyImageFilter Self;
-    typedef BaseProbabilisticTractographyImageFilter < itk::VectorImage <double, 3> > Superclass;
+    typedef ODFParticleFilteringTractographyImageFilter Self;
+    typedef BaseParticleFilteringTractographyImageFilter < itk::VectorImage <double, 3> > Superclass;
 
     typedef itk::SmartPointer<Self> Pointer;
     typedef itk::SmartPointer<const Self> ConstPointer;
 
     itkNewMacro(Self)
 
-    itkTypeMacro(ODFProbabilisticTractographyImageFilter,BaseProbabilisticTractographyImageFilter)
+    itkTypeMacro(ODFParticleFilteringTractographyImageFilter,BaseParticleFilteringTractographyImageFilter)
 
     void SetODFSHOrder(unsigned int num);
     itkSetMacro(GFAThreshold,double)
 
 protected:
-    ODFProbabilisticTractographyImageFilter();
-    virtual ~ODFProbabilisticTractographyImageFilter();
+    ODFParticleFilteringTractographyImageFilter();
+    virtual ~ODFParticleFilteringTractographyImageFilter();
 
     //! Generate seed points
     void PrepareTractography() ITK_OVERRIDE;
@@ -48,7 +48,7 @@ protected:
     double GetGeneralizedFractionalAnisotropy(VectorType &modelValue);
 
 private:
-    ITK_DISALLOW_COPY_AND_ASSIGN(ODFProbabilisticTractographyImageFilter);
+    ITK_DISALLOW_COPY_AND_ASSIGN(ODFParticleFilteringTractographyImageFilter);
 
     double m_GFAThreshold;
 

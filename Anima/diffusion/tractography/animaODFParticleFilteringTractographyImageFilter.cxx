@@ -1,4 +1,4 @@
-#include "animaODFProbabilisticTractographyImageFilter.h"
+#include "animaODFParticleFilteringTractographyImageFilter.h"
 #include <cmath>
 #include <random>
 
@@ -14,8 +14,8 @@
 namespace anima
 {
 
-ODFProbabilisticTractographyImageFilter::ODFProbabilisticTractographyImageFilter()
-    : BaseProbabilisticTractographyImageFilter()
+ODFParticleFilteringTractographyImageFilter::ODFParticleFilteringTractographyImageFilter()
+    : BaseParticleFilteringTractographyImageFilter()
 {
     m_ODFSHOrder = 4;
     m_GFAThreshold = 0.1;
@@ -25,16 +25,16 @@ ODFProbabilisticTractographyImageFilter::ODFProbabilisticTractographyImageFilter
     this->SetModelDimension(15);
 }
 
-ODFProbabilisticTractographyImageFilter::~ODFProbabilisticTractographyImageFilter()
+ODFParticleFilteringTractographyImageFilter::~ODFParticleFilteringTractographyImageFilter()
 {
     if (m_ODFSHBasis)
         delete m_ODFSHBasis;
 }
 
-void ODFProbabilisticTractographyImageFilter::PrepareTractography()
+void ODFParticleFilteringTractographyImageFilter::PrepareTractography()
 {
     // Call base preparation
-    BaseProbabilisticTractographyImageFilter::PrepareTractography();
+    BaseParticleFilteringTractographyImageFilter::PrepareTractography();
 
     m_ODFSHOrder = std::round(-1.5 + 0.5 * std::sqrt(8 * this->GetInputModelImage()->GetNumberOfComponentsPerPixel() + 1));
     this->SetModelDimension((m_ODFSHOrder + 1)*(m_ODFSHOrder + 2)/2);
@@ -46,9 +46,9 @@ void ODFProbabilisticTractographyImageFilter::PrepareTractography()
     m_ODFSHBasis = new anima::ODFSphericalHarmonicBasis(m_ODFSHOrder);
 }
 
-ODFProbabilisticTractographyImageFilter::Vector3DType
-ODFProbabilisticTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
-                                                             std::mt19937 &random_generator, unsigned int threadId)
+ODFParticleFilteringTractographyImageFilter::Vector3DType
+ODFParticleFilteringTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
+                                                                 std::mt19937 &random_generator, unsigned int threadId)
 {
     Vector3DType resVec(0.0);
     bool is2d = (this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] == 1);
@@ -67,7 +67,7 @@ ODFProbabilisticTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDi
     return resVec;
 }
 
-bool ODFProbabilisticTractographyImageFilter::CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId)
+bool ODFParticleFilteringTractographyImageFilter::CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue, unsigned int threadId)
 {
     if (estimatedB0Value < 50.0)
         return false;
@@ -92,9 +92,9 @@ bool ODFProbabilisticTractographyImageFilter::CheckModelProperties(double estima
     return true;
 }
 
-double ODFProbabilisticTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &previousDirection,
-                                                                       Vector3DType &newDirection, VectorType &previousModelValue, VectorType &modelValue,
-                                                                       unsigned int threadId)
+double ODFParticleFilteringTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &previousDirection,
+                                                                           Vector3DType &newDirection, VectorType &previousModelValue, VectorType &modelValue,
+                                                                           unsigned int threadId)
 {
     // Prior is a Watson PDF
     double log_prior = anima::safe_log(anima::EvaluateWatsonPDF(newDirection, previousDirection, this->GetKappaOfPriorDistribution()));
@@ -161,8 +161,8 @@ double ODFProbabilisticTractographyImageFilter::ComputeLogWeightUpdate(double b0
     return resVal;
 }
 
-void ODFProbabilisticTractographyImageFilter::ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index,
-                                                                VectorType &modelValue)
+void ODFParticleFilteringTractographyImageFilter::ComputeModelValue(InterpolatorPointer &modelInterpolator, ContinuousIndexType &index,
+                                                                    VectorType &modelValue)
 {
     modelValue.SetSize(this->GetModelDimension());
     modelValue.Fill(0.0);
@@ -171,7 +171,7 @@ void ODFProbabilisticTractographyImageFilter::ComputeModelValue(InterpolatorPoin
         modelValue = modelInterpolator->EvaluateAtContinuousIndex(index);
 }
 
-double ODFProbabilisticTractographyImageFilter::GetGeneralizedFractionalAnisotropy(VectorType &modelValue)
+double ODFParticleFilteringTractographyImageFilter::GetGeneralizedFractionalAnisotropy(VectorType &modelValue)
 {
     double sumSquares = 0;
     for (unsigned int i = 0;i < this->GetModelDimension();++i)
