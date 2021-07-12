@@ -6,6 +6,8 @@
 #include <itkLightObject.h>
 #include <itkObjectFactory.h>
 
+#include <random>
+
 namespace anima
 {
 
@@ -78,6 +80,12 @@ public:
 
     //! Re-orient the MCM using the provided transform, the flag precises if the transform id rigid or affine
     void Reorient(vnl_matrix <double> &orientationMatrix, bool affineTransform);
+
+    //! Get a sampled direction from the model, either only from the anisotropic part or from the whole model
+    void GetRandomlySampledDirection(std::mt19937 &random_generator, bool useIsotropicPart, Vector3DType &sample);
+
+    //! Get the integral of diffusion PDF along direction given by input vector (using or not the isotropic part of the model
+    double GetAlongDirectionDiffusionProfileIntegral(Vector3DType &direction, bool useIsotropicPart);
 
     void SetOptimizeWeights(bool val) {m_OptimizeWeights = val;}
     itkGetMacro(OptimizeWeights, bool)

@@ -2,6 +2,7 @@
 
 #include <itkSymmetricEigenAnalysis.h>
 #include <animaMCMConstants.h>
+#include <animaDistributionSampling.h>
 
 namespace anima
 {
@@ -470,6 +471,55 @@ void TensorCompartment::UpdateAngleConfiguration()
     m_EigenVector2[2] = m_SinTheta * m_SinAlpha;
 
     m_ModifiedAngles = false;
+}
+
+void TensorCompartment::GetRandomlySampledDirection(std::mt19937 &random_generator, Vector3DType &sample)
+{
+    // Ensure diffusion tensor is computed
+    this->GetDiffusionTensor();
+
+    Vector3DType mean(0.0);
+
+    anima::SampleFromMultivariateGaussianDistribution(mean,m_DiffusionTensor.GetVnlMatrix().as_matrix(),sample,random_generator);
+    anima::Normalize(sample,sample);
+}
+
+
+double TensorCompartment::GetAlongDirectionDiffusionProfileIntegralLogarithm(Vector3DType &direction)
+{
+    // Ensure diffusion tensor is computed
+    this->GetDiffusionTensor();
+
+    itk::SymmetricEigenAnalysis < Matrix3DType, vnl_diag_matrix <double> , vnl_matrix <double> > EigenAnalysis(3);
+
+    vnl_matrix <double> eigVecs(3,3), tensor(3,3);
+    vnl_diag_matrix <double> eigVals(3);
+
+    EigenAnalysis.ComputeEigenValuesAndVectors(m_DiffusionTensor,eigVals,eigVecs);
+
+    double detTensor = 1.0;
+    for (unsigned int i = 0;i < 3;++i)
+    {
+        detTensor *= eigVals[i];
+        eigVals[i] = 1.0 / eigVals[i];
+    }
+
+    anima::RecomposeTensor(eigVals,eigVecs,tensor);
+    double tensorFactor = 0.0;
+    for (unsigned int i = 0;i < 3;++i)
+    {
+        for (unsigned int j = i + 1;j < 3;++j)
+            tensorFactor += 2.0 * direction[i] * direction[j] * tensor(i,j);
+
+        tensorFactor += direction[i] * direction[i] * tensor(i,i);
+    }
+
+    tensorFactor *= 0.5;
+    // TO DO : check formula and correct where needed
+    double resValue = - 3 * std::log(2 * M_PI) - std::log(detTensor) + std::log(M_PI) - std::log(tensorFactor);
+    resValue /= 2.0;
+
+    return resValue;
 }
 
 double TensorCompartment::GetApparentFractionalAnisotropy()

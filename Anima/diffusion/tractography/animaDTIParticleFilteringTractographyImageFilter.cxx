@@ -115,6 +115,7 @@ double DTIParticleFilteringTractographyImageFilter::ComputeLogWeightUpdate(doubl
     }
 
     tensorFactor *= 0.5;
+    // TO DO : check formula and correct where needed
     log_proposal = - 3 * std::log(2 * M_PI) - std::log(detPreviousTensor) + std::log(M_PI) - std::log(tensorFactor);
     log_proposal /= 2.0;
 

@@ -288,6 +288,53 @@ double MultiCompartmentModel::GetDiffusionProfile(Vector3DType &sample)
     return resVal;
 }
 
+void MultiCompartmentModel::GetRandomlySampledDirection(std::mt19937 &random_generator, bool useIsotropicPart,
+                                                        Vector3DType &sample)
+{
+    unsigned int numCompartments = m_Compartments.size();
+    unsigned int startPoint = 0;
+
+    if (!useIsotropicPart)
+    {
+        startPoint = m_NumberOfIsotropicCompartments;
+        numCompartments -= m_NumberOfIsotropicCompartments;
+    }
+
+    m_WorkVector.resize(numCompartments);
+    for (unsigned int i = 0;i < numCompartments;++i)
+        m_WorkVector[i] = m_CompartmentWeights[i + startPoint];
+
+    std::discrete_distribution<> dist(m_WorkVector.begin(),m_WorkVector.end());
+    unsigned int selectedCompartment = startPoint + dist(random_generator);
+
+    m_Compartments[selectedCompartment]->GetRandomlySampledDirection(random_generator, sample);
+}
+
+double MultiCompartmentModel::GetAlongDirectionDiffusionProfileIntegral(Vector3DType &direction, bool useIsotropicPart)
+{
+    unsigned int numCompartments = m_Compartments.size();
+    unsigned int startPoint = 0;
+
+    if (!useIsotropicPart)
+        startPoint = m_NumberOfIsotropicCompartments;
+
+    double sumWeights = 0.0;
+    double integralValue = 0.0;
+    for (unsigned int i = startPoint;i < numCompartments;++i)
+    {
+        if (m_CompartmentWeights[i] == 0.0)
+            continue;
+
+        sumWeights += m_CompartmentWeights[i];
+        integralValue += m_CompartmentWeights[i] * std::exp(m_Compartments[i]->GetAlongDirectionDiffusionProfileIntegralLogarithm(direction));
+    }
+
+    if (sumWeights != 0.0)
+        integralValue /= sumWeights;
+
+    return integralValue;
+}
+
 MultiCompartmentModel::ListType &MultiCompartmentModel::GetParameterLowerBounds()
 {
     unsigned int vectorSize = 0;

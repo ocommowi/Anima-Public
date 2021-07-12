@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <random>
+
 #include <vnl/vnl_vector_fixed.h>
 #include <itkMatrix.h>
 #include <itkLightObject.h>
@@ -78,6 +80,12 @@ public:
 
     //! Reorient the fascicle compartment using a matrix, the flag specifies if the transform is affine or rigid
     virtual void Reorient(vnl_matrix <double> &orientationMatrix, bool affineTransform);
+
+    //! Get a sampled direction from the model
+    virtual void GetRandomlySampledDirection(std::mt19937 &random_generator, Vector3DType &sample);
+
+    //! Get the logarithm of the PDF integral of the model along the input orientation
+    virtual double GetAlongDirectionDiffusionProfileIntegralLogarithm(Vector3DType &direction);
 
     virtual double GetOrientationTheta() {return m_OrientationTheta;}
     virtual double GetOrientationPhi() {return m_OrientationPhi;}

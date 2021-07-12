@@ -117,6 +117,16 @@ void BaseCompartment::Reorient(vnl_matrix <double> &orientationMatrix, bool affi
     this->SetOrientationPhi(tmpRotatedDir[1]);
 }
 
+void BaseCompartment::GetRandomlySampledDirection(std::mt19937 &random_generator, Vector3DType &sample)
+{
+    throw itk::ExceptionObject(__FILE__,__LINE__,"This compartment type does not support random sampling",ITK_LOCATION);
+}
+
+double BaseCompartment::GetAlongDirectionDiffusionProfileIntegralLogarithm(Vector3DType &direction)
+{
+    throw itk::ExceptionObject(__FILE__,__LINE__,"This compartment type does not support PDF integral omcputation",ITK_LOCATION);
+}
+
 const BaseCompartment::Matrix3DType &BaseCompartment::GetDiffusionTensor()
 {
     throw itk::ExceptionObject(__FILE__,__LINE__,"This compartment type does not support diffusion tensor export",ITK_LOCATION);

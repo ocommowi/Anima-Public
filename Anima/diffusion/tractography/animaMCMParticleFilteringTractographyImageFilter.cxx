@@ -7,6 +7,7 @@
 #include <animaVMFDistribution.h>
 #include <animaWatsonDistribution.h>
 #include <animaBaseCompartment.h>
+#include <animaMCMConstants.h>
 #include <animaMCMLinearInterpolateImageFunction.h>
 
 namespace anima
@@ -43,201 +44,32 @@ MCMParticleFilteringTractographyImageFilter::GetModelInterpolator()
 
 MCMParticleFilteringTractographyImageFilter::Vector3DType
 MCMParticleFilteringTractographyImageFilter::ProposeNewDirection(Vector3DType &oldDirection, VectorType &modelValue,
-                                                             Vector3DType &sampling_direction, double &log_prior,
-                                                             double &log_proposal, std::mt19937 &random_generator,
-                                                             unsigned int threadId)
+                                                                 std::mt19937 &random_generator, unsigned int threadId)
 {
-    double chosenKappa = 0;
+    bool is2d = (this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] == 1);
 
     m_WorkModels[threadId]->SetModelVector(modelValue);
-    unsigned int numIsoCompartments = m_WorkModels[threadId]->GetNumberOfIsotropicCompartments();
-    unsigned int numDirs = m_WorkModels[threadId]->GetNumberOfCompartments();
-    bool is2d = this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] <= 1;
-    
-    ListType mixtureWeights;
-    ListType kappaValues;
-    DirectionVectorType maximaMCM;
-    
-    unsigned int effectiveNumDirs = 0;
-    Vector3DType direction;
-    for (unsigned int i = numIsoCompartments;i < numDirs;++i)
-    {
-        double weight = m_WorkModels[threadId]->GetCompartmentWeight(i);
-        if (weight == 0)
-            continue;
-
-        anima::BaseCompartment *workCompartment = m_WorkModels[threadId]->GetCompartment(i);
-        double fa = workCompartment->GetApparentFractionalAnisotropy();
-        
-        if (fa < m_FAThreshold)
-            continue;
-        
-        anima::TransformSphericalToCartesianCoordinates(workCompartment->GetOrientationTheta(),workCompartment->GetOrientationPhi(),
-                                                        1.0,direction);
-        
-        if (is2d)
-        {
-            direction[2] = 0;
-            direction.Normalize();
-        }
-        
-        if (anima::ComputeScalarProduct(oldDirection, direction) < 0)
-            direction *= -1;
-        
-        maximaMCM.push_back(direction);
-        kappaValues.push_back(GetKappaFromFA(fa));
-        mixtureWeights.push_back(weight);
-        
-        ++effectiveNumDirs;
-    }
-    
-    if (effectiveNumDirs == 0)
-    {
-        maximaMCM.push_back(oldDirection);
-        kappaValues.push_back(this->GetKappaOfPriorDistribution());
-        mixtureWeights.push_back(1.0);
-    }
-    
-    std::discrete_distribution<> dist(mixtureWeights.begin(),mixtureWeights.end());
-    unsigned int chosenDirection = dist(random_generator);
-    sampling_direction = maximaMCM[chosenDirection];
-    chosenKappa = kappaValues[chosenDirection];
-    
-    bool nullOld = true;
-    for (unsigned int i = 0;i < 3;++i)
-    {
-        if (sampling_direction[i] != 0)
-        {
-            nullOld = false;
-            break;
-        }
-    }
-    
-    if (nullOld)
-        itkExceptionMacro("Null old direction, we're doomed");
+    MCModelType::Vector3DType direction;
+    m_WorkModels[threadId]->GetRandomlySampledDirection(random_generator, false, direction);
 
     Vector3DType resVec;
-    //    if (chosenKappa > 700)
-    //        anima::SampleFromVMFDistributionNumericallyStable(chosenKappa,sampling_direction,resVec,random_generator);
-    //    else
-    //        anima::SampleFromVMFDistribution(chosenKappa,sampling_direction,resVec,random_generator);
-    
-    anima::SampleFromWatsonDistribution(chosenKappa,sampling_direction,resVec,3,random_generator);
-    
+    for (unsigned int i = 0;i < 3;++i)
+        resVec[i] = direction[i];
+
     if (is2d)
     {
         resVec[InputModelImageType::ImageDimension - 1] = 0;
         resVec.Normalize();
     }
-    
-    if (effectiveNumDirs > 0)
-    {
-        //        log_prior = anima::safe_log(anima::ComputeVMFPdf(resVec, oldDirection, this->GetKappaOfPriorDistribution()));
-        log_prior = anima::safe_log(anima::EvaluateWatsonPDF(resVec, oldDirection, this->GetKappaOfPriorDistribution()));
-        
-        log_proposal = 0;
-        double sumWeights = 0;
-        for (unsigned int i = 0;i < effectiveNumDirs;++i)
-        {
-            //            log_proposal += mixtureWeights[i] * anima::ComputeVMFPdf(resVec, maximaMCM[i], kappaValues[i]);
-            log_proposal += mixtureWeights[i] * anima::EvaluateWatsonPDF(resVec, maximaMCM[i], kappaValues[i]);
-            sumWeights += mixtureWeights[i];
-        }
-        
-        log_proposal = anima::safe_log(log_proposal / sumWeights);
-    }
-    
+
     if (anima::ComputeScalarProduct(oldDirection, resVec) < 0)
         resVec *= -1;
     
     return resVec;
 }
 
-MCMParticleFilteringTractographyImageFilter::Vector3DType MCMParticleFilteringTractographyImageFilter::InitializeFirstIterationFromModel(Vector3DType &colinearDir, VectorType &modelValue,
-                                                                                                                                 unsigned int threadId)
-{
-    Vector3DType resVec, tmpVec;
-    bool is2d = (this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] == 1);
-
-    m_WorkModels[threadId]->SetModelVector(modelValue);
-    unsigned int numIsoCompartments = m_WorkModels[threadId]->GetNumberOfIsotropicCompartments();
-    unsigned int numberCompartments = m_WorkModels[threadId]->GetNumberOfCompartments();
-
-    double maxVal = 0;
-
-    switch (this->GetInitialDirectionMode())
-    {
-        case Colinear:
-        {
-            for (unsigned int i = numIsoCompartments;i < numberCompartments;++i)
-            {
-                if (m_WorkModels[threadId]->GetCompartmentWeight(i) == 0)
-                    continue;
-
-                anima::TransformSphericalToCartesianCoordinates(m_WorkModels[threadId]->GetCompartment(i)->GetOrientationTheta(),
-                                                                m_WorkModels[threadId]->GetCompartment(i)->GetOrientationPhi(),
-                                                                1.0,tmpVec);
-
-                double tmpVal = anima::ComputeScalarProduct(colinearDir, tmpVec);
-
-                if (tmpVal < 0)
-                {
-                    tmpVec *= -1;
-                    tmpVal *= -1;
-                }
-
-                if (tmpVal > maxVal)
-                {
-                    resVec = tmpVec;
-                    maxVal = tmpVal;
-                }
-            }
-
-            break;
-        }
-
-        case Weight:
-        default:
-        {
-            unsigned int indexMax = numIsoCompartments;
-            maxVal = m_WorkModels[threadId]->GetCompartmentWeight(numIsoCompartments);
-
-            for (unsigned int i = numIsoCompartments+1;i < numberCompartments;++i)
-            {
-                if (m_WorkModels[threadId]->GetCompartmentWeight(i) >= maxVal)
-                {
-                    maxVal = m_WorkModels[threadId]->GetCompartmentWeight(i);
-                    indexMax = i;
-                }
-            }
-
-            anima::TransformSphericalToCartesianCoordinates(m_WorkModels[threadId]->GetCompartment(indexMax)->GetOrientationTheta(),
-                                                            m_WorkModels[threadId]->GetCompartment(indexMax)->GetOrientationPhi(),
-                                                            1.0,resVec);
-
-            double tmpVal = anima::ComputeScalarProduct(colinearDir, resVec);
-
-            if (tmpVal < 0)
-                resVec *= -1;
-
-            break;
-        }
-    }
-
-    if (maxVal == 0)
-        resVec = colinearDir;
-
-    if (is2d)
-    {
-        resVec[2] = 0;
-        resVec.Normalize();
-    }
-
-    return resVec;
-}
-
 bool MCMParticleFilteringTractographyImageFilter::CheckModelProperties(double estimatedB0Value, double estimatedNoiseValue, VectorType &modelValue,
-                                                                   unsigned int threadId)
+                                                                       unsigned int threadId)
 {
     // Prevent fibers from going outside of brain mask
     if (estimatedB0Value < 10.0)
@@ -277,44 +109,66 @@ bool MCMParticleFilteringTractographyImageFilter::CheckModelProperties(double es
     return true;
 }
 
-double MCMParticleFilteringTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &newDirection, VectorType &modelValue,
-                                                                       double &log_prior, double &log_proposal, unsigned int threadId)
+double MCMParticleFilteringTractographyImageFilter::ComputeLogWeightUpdate(double b0Value, double noiseValue, Vector3DType &previousDirection,
+                                                                           Vector3DType &newDirection, VectorType &previousModelValue, VectorType &modelValue,
+                                                                           unsigned int threadId)
 {
-    double logLikelihood = 0.0;
-    Vector3DType tmpVec;
+    // Prior is a Watson PDF
+    double log_prior = anima::safe_log(anima::EvaluateWatsonPDF(newDirection, previousDirection, this->GetKappaOfPriorDistribution()));
 
-    bool is2d = (this->GetInputModelImage()->GetLargestPossibleRegion().GetSize()[2] == 1);
+    // Proposal is the probability to get the sampled new direction from the previous model. We assume the ODF integral is 1
+    m_WorkModels[threadId]->SetModelVector(previousModelValue);
+    MCModelType::Vector3DType tmpDirection;
+    for (unsigned int i = 0;i < 3;++i)
+        tmpDirection[i] = newDirection[i];
+    double log_proposal = std::log(m_WorkModels[threadId]->GetAlongDirectionDiffusionProfileIntegral(tmpDirection,false));
 
-    MCModelPointer workModel = m_WorkModels[threadId];
-    workModel->SetModelVector(modelValue);
+    // Log-likelihood: simulate from model at arrival and from current direction viewed as generic zeppelin tensor
+    double log_likelihood = 0;
+    m_WorkModels[threadId]->SetModelVector(modelValue);
 
-    double concentrationParameter = b0Value / std::sqrt(noiseValue);
+    unsigned int numGradientImages = this->GetNumberOfGradientDirections();
+    MCModelType::Vector3DType gradient;
+    vnl_matrix <double> zeppelinDirection(3,3);
+    zeppelinDirection.fill(0.0);
 
-    bool oneTested = false;
-    for (unsigned int i = workModel->GetNumberOfIsotropicCompartments();i < workModel->GetNumberOfCompartments();++i)
+    for (unsigned int i = 0;i < 3;++i)
     {
-        if (workModel->GetCompartmentWeight(i) == 0)
-            continue;
-
-        anima::TransformSphericalToCartesianCoordinates(workModel->GetCompartment(i)->GetOrientationTheta(),
-                                                        workModel->GetCompartment(i)->GetOrientationPhi(),
-                                                        1.0,tmpVec);
-
-        if (is2d)
+        zeppelinDirection(i,i) = 1.5e-4 + (1.71e-3 - 1.5e-4) * newDirection[i] * newDirection[i];
+        for (unsigned int j = i + 1;j < 3;++j)
         {
-            tmpVec[2] = 0.0;
-            anima::Normalize(tmpVec,tmpVec);
-        }
-
-        double tmpVal = std::log(anima::EvaluateWatsonPDF(tmpVec, newDirection, concentrationParameter));
-        if ((tmpVal > logLikelihood)||(!oneTested))
-        {
-            logLikelihood = tmpVal;
-            oneTested = true;
+            zeppelinDirection(i,j) = (1.71e-3 - 1.5e-4) * newDirection[i] * newDirection[j];
+            zeppelinDirection(j,i) = zeppelinDirection(i,j);
         }
     }
 
-    double resVal = logLikelihood + log_prior - log_proposal;
+    for (unsigned int i = 0;i < numGradientImages;++i)
+    {
+        double internalProductDirection = 0.0;
+        double bvalue = this->GetBValueItem(i);
+        double gradientStrength = anima::GetGradientStrengthFromBValue(bvalue,anima::DiffusionSmallDelta, anima::DiffusionBigDelta);
+        for (unsigned int j = 0;j < 3;++j)
+            gradient[j] = this->GetDiffusionGradient(i)[j];
+        double predictedSignalMCM = m_WorkModels[threadId]->GetPredictedSignal(anima::DiffusionSmallDelta, anima::DiffusionBigDelta,
+                                                                               gradientStrength, gradient);
+
+        for (unsigned int j = 0;j < 3;++j)
+        {
+            internalProductDirection += gradient[j] * gradient[j] * zeppelinDirection(j,j);
+
+            for (unsigned int k = j + 1;k < 3;++k)
+                internalProductDirection += 2.0 * gradient[j] * gradient[k] * zeppelinDirection(j,k);
+        }
+
+        internalProductDirection *= bvalue;
+
+        double diffValue = b0Value * (predictedSignalMCM - std::exp(- internalProductDirection));
+        double logNoiseGaussValue = 0.5 * (std::log(noiseValue) + std::log(2.0 * M_PI) + diffValue * diffValue / noiseValue);
+
+        log_likelihood -= logNoiseGaussValue;
+    }
+
+    double resVal = log_prior + log_likelihood - log_proposal;
     return resVal;
 }
 
@@ -325,20 +179,6 @@ void MCMParticleFilteringTractographyImageFilter::ComputeModelValue(Interpolator
 
     if (modelInterpolator->IsInsideBuffer(index))
         modelValue = modelInterpolator->EvaluateAtContinuousIndex(index);
-}
-
-void MCMParticleFilteringTractographyImageFilter::SetKappaPolynomialCoefficients(ListType &coefs)
-{
-    m_KappaPolynomialCoefficients = coefs;
-}
-
-double MCMParticleFilteringTractographyImageFilter::GetKappaFromFA(double FA)
-{
-    double resVal = 0.0;
-    for (unsigned int i = 0;i < m_KappaPolynomialCoefficients.size();++i)
-        resVal += m_KappaPolynomialCoefficients[i] * std::pow(FA, (double)i);
-
-    return 0.5 * resVal;
 }
 
 } // end of namespace anima

@@ -2,6 +2,7 @@
 #include <animaMCMConstants.h>
 
 #include <cmath>
+#include <animaDistributionSampling.h>
 
 namespace anima
 {
@@ -108,6 +109,17 @@ const BaseIsotropicCompartment::Matrix3DType &BaseIsotropicCompartment::GetDiffu
         m_DiffusionTensor(i,i) = this->GetAxialDiffusivity();
 
     return m_DiffusionTensor;
+}
+
+void BaseIsotropicCompartment::GetRandomlySampledDirection(std::mt19937 &random_generator, Vector3DType &sample)
+{
+    anima::SampleFromUniformDistributionOn2Sphere(random_generator,sample);
+}
+
+double BaseIsotropicCompartment::GetAlongDirectionDiffusionProfileIntegralLogarithm(Vector3DType &direction)
+{
+    double value = std::log(- 2.0 * M_PI); // log (2 / unit sphere surface)
+    return value;
 }
 
 double BaseIsotropicCompartment::GetApparentFractionalAnisotropy()

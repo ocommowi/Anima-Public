@@ -51,6 +51,9 @@ public:
     double GetApparentPerpendicularDiffusivity() ITK_OVERRIDE;
     double GetApparentParallelDiffusivity() ITK_OVERRIDE;
 
+    void GetRandomlySampledDirection(std::mt19937 &random_generator, Vector3DType &sample) ITK_OVERRIDE;
+    double GetAlongDirectionDiffusionProfileIntegralLogarithm(Vector3DType &direction) ITK_OVERRIDE;
+
 protected:
     StickCompartment() : Superclass()
     {
